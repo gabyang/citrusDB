@@ -75,7 +75,7 @@ class Transactions:
         return [int(params[0]), int(params[1]), int(params[2])]
 
     # 2.1 new-order transaction
-    def new_order_txn(self, c_id, w_id, d_id, num_items, item_numbers, supplier_warehouses, quantities):
+    def new_order_txn(self, c_id, w_id, d_id, num_items, item_ids, supplier_warehouses, quantities):
         """
         Handles a new order transaction based on parsed inputs.
 
@@ -84,7 +84,7 @@ class Transactions:
             w_id (int): Warehouse ID
             d_id (int): District ID
             num_items (int): Number of items in the order
-            item_numbers (List[int]): List of item IDs
+            item_ids (List[int]): List of item IDs
             supplier_warehouses (List[int]): List of supplier warehouse IDs
             quantities (List[int]): List of quantities for each item
         """
@@ -92,7 +92,7 @@ class Transactions:
         orderline_inputs = []
         for i in range(num_items):
             orderline_inputs.append((
-                item_numbers[i],
+                item_ids[i],
                 supplier_warehouses[i],
                 quantities[i]
             ))
@@ -108,7 +108,6 @@ class Transactions:
 
         # step 3
         entry_time = datetime.now(timezone.utc)
-        print(is_all_local)
         self.cursor.execute("INSERT INTO \"order\"(O_ID, O_D_ID, O_W_ID, O_C_ID, O_ENTRY_D, O_CARRIER_ID, O_OL_CNT, O_ALL_LOCAL) VALUES (%s, %s, %s, %s, %s, NULL, %s, %s)", 
                             (next_order_id, d_id, w_id, c_id, entry_time, num_items, is_all_local))
         
@@ -117,89 +116,74 @@ class Transactions:
         orderline_outputs = []
         stock_deltas = []
 
-        for ol in orderline_inputs:
+        # retrieve item prices
+        self.cursor.execute("SELECT I_PRICE, I_NAME FROM item WHERE I_ID = ANY(%s)", (item_ids,))
+        result = self.cursor.fetchall()
+        item_prices = [round(float(x[0]), 2) for x in result]
+        item_names = [x[1] for x in result]
+
+        # retrieve distance information
+        stock_dist_id = f'S_DIST_0{d_id}' if d_id < 10 else f'S_DIST_{d_id}'
+        query = f"SELECT {stock_dist_id} FROM stock WHERE S_I_ID = ANY(%s) AND S_W_ID = {w_id}"
+        self.cursor.execute(query, (item_ids,))
+        result = self.cursor.fetchall()
+        ol_dist = [x[0] for x in result]
+        # TODO: check if the ol_dist needs to be stripped of its blank spaces - note that the distances already have blank spaces.
+
+        # TODO: Optimize the for loop below to update ALL if that is possible.
+        for idx, ol in enumerate(orderline_inputs):
+            ol_item_id = ol[0]
+            ol_warehouse = ol[1]
+            ol_quantity = ol[2]
             self.cursor.execute("SELECT S_QUANTITY, S_YTD, S_ORDER_CNT, S_REMOTE_CNT FROM stock WHERE S_I_ID = %s AND S_W_ID = %s", 
-                (ol[0], ol[1]))
+                (ol_item_id, ol_warehouse))
 
             quantity, ytd, order_count, remote_count = self.cursor.fetchone()
 
-            next_quantity = quantity + ol[3]
+            next_quantity = quantity + ol_quantity
             next_quantity = next_quantity + 100 if next_quantity < 10 else next_quantity
-            next_ytd = ytd + ol[3]
+            next_ytd = ytd + ol_quantity
             next_order_count = order_count + 1
-            next_remote_count = remote_count + (1 if ol[1] != w_id else 0)
+            next_remote_count = remote_count + (1 if ol_warehouse != w_id else 0)
 
-            self.cursor.execute("UPDATE stocks SET S_QUANTITY = ?, S_YTD = ?, S_ORDER_CNT = ?, S_REMOTE_CNT = ? WHERE s_w_id = ? AND s_i_id = ?", 
-                (next_quantity, next_ytd, next_order_count, next_remote_count, ol[1], ol[0])
+            self.cursor.execute("UPDATE stock SET S_QUANTITY = %s, S_YTD = %s, S_ORDER_CNT = %s, S_REMOTE_CNT = %s WHERE s_w_id = %s AND s_i_id = %s", 
+                (next_quantity, next_ytd, next_order_count, next_remote_count, ol_warehouse, ol_item_id)
             )
 
-            item_info = item_id_to_item_info[ol.ItemId]
-            item_amount = item_info.Price * ol.Quantity
+            item_amount = item_prices[idx] * ol_quantity
             total_amount += item_amount
 
+            orderline_outputs.append([
+                ol_item_id, item_names[idx], ol_warehouse, ol_quantity, item_amount, next_quantity
+            ])
+
+            # step 5
+            self.cursor.execute(
+                "INSERT INTO \"order-line\"(ol_w_id, ol_d_id, ol_o_id, ol_number, ol_i_id, ol_amount, ol_supply_w_id, ol_quantity, ol_dist_info, ol_delivery_d) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NULL)",
+                (w_id, d_id, next_order_id, idx + 1, ol_item_id, item_prices[idx], ol_warehouse, ol_quantity, ol_dist[idx])
+            )
         
-        # def update_stock_txn():
-        #     nonlocal total_amount
-        #     for ol in orderline_inputs:
-        #         quantity, ytd, order_count, remote_count = db.execute(
-        #             "SELECT s_qty, s_ytd, s_order_cnt, s_remote_cnt FROM stocks WHERE s_w_id = ? AND s_i_id = ?", 
-        #             (ol.SupplyWid, ol.ItemId)
-        #         ).fetchone()
-                
-        #         next_quantity = quantity + ol.Quantity
-        #         next_quantity = next_quantity + 100 if next_quantity < 10 else next_quantity
-        #         next_ytd = ytd + ol.Quantity
-        #         next_order_count = order_count + 1
-        #         next_remote_count = remote_count + (1 if ol.SupplyWid != w_id else 0)
-                
-        #         db.execute(
-        #             "UPDATE stocks SET s_qty = ?, s_ytd = ?, s_order_cnt = ?, s_remote_cnt = ? WHERE s_w_id = ? AND s_i_id = ?", 
-        #             (next_quantity, next_ytd, next_order_count, next_remote_count, ol.SupplyWid, ol.ItemId)
-        #         )
+        self.cursor.execute("SELECT d_tax FROM district WHERE D_ID = %s AND D_W_ID = %s", (d_id, w_id))
+        d_tax = round(float(self.cursor.fetchone()[0]), 2)
+        print(d_tax)
 
-        #         item_info = item_id_to_item_info[ol.ItemId]
-        #         item_amount = item_info.Price * ol.Quantity
-        #         total_amount += item_amount
-                
-        #         orderline_outputs.append(OrderlineOutput(
-        #             ol.ItemId, item_info.Name, ol.SupplyWid, ol.Quantity, item_amount, next_quantity, item_info.DistInfo
-        #         ))
+        self.cursor.execute("SELECT w_tax FROM warehouse WHERE W_ID = %s", (w_id,))
+        w_tax = round(float(self.cursor.fetchone()[0]), 4)
+        print(w_tax)
 
-        #         stock_deltas.append(StockDelta(
-        #             next_quantity - quantity, next_ytd - ytd, 1, next_remote_count - remote_count, ol.SupplyWid, ol.ItemId
-        #         ))
+        self.cursor.execute("SELECT c_discount, c_last, c_credit FROM customer WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s", (w_id, d_id, c_id))
+        c_discount, c_last, c_credit = self.cursor.fetchone()
+        print(c_discount, c_last, c_credit)
 
-        # retry(update_stock_txn)
-        
-        # self.cursor.execute("SELECT * FROM \"order\" WHERE O_ID = %s AND O_D_ID = %s AND O_W_ID = %s", (next_order_id, d_id, w_id))
-        # print(self.cursor.fetchone())
-
-        
-        # step 4 & 5
-
-
-        # def insert_order_txn():
-        #     # Insert order in orders table
-        #     db.execute(
-        #         "INSERT INTO orders(o_w_id, o_d_id, o_id, o_c_id, o_carrier_id, o_ol_cnt, o_all_local, o_entry_d) VALUES (?, ?, ?, ?, NULL, ?, ?, ?)", 
-        #         (w_id, d_id, next_order_id, c_id, num_items, is_all_local, entry_time)
-        #     )
-
-        #     # Insert each order line in order_lines table
-        #     for i, ol in enumerate(orderline_outputs):
-        #         db.execute(
-        #             "INSERT INTO order_lines(ol_w_id, ol_d_id, ol_o_id, ol_number, ol_i_id, ol_i_name, ol_delivery_d, ol_amount, ol_supply_w_id, ol_quantity, ol_dist_info) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)",
-        #             (w_id, d_id, next_order_id, i + 1, ol.ItemId, ol.Name, ol.ItemAmount, ol.SupplyWid, ol.Quantity, ol.DistInfo)
-        #         )
-
-        # retry(insert_order_txn)
-
+        print(next_order_id, entry_time)
 
         # step 6 
-        # self.cursor.execute("SELECT d_tax, w_tax FROM district WHERE D_ID = %s AND D_W_ID = %s", (d_id, w_id))
-        # d_tax, w_tax = self.cursor.fetchone()
-        # print(d_tax, w_tax)
-                
+        total_amount = total_amount * (1 + d_tax + w_tax) * (1 - c_discount)
+        print(num_items, total_amount)
+
+        print(orderline_outputs)
+
+
         return
 
     # 2.2 payment transaction
@@ -229,55 +213,3 @@ class Transactions:
     # 2.8 related-customer transactions
     def related_customer_txn(self, c_w_id, c_d_id, c_id):
         return
-
-
-
-# 2.1 new-order transaction
-def new_order_txn(c_id, w_id, d_id, num_items, item_numbers, supplier_warehouses, quantities):
-    
-    # Initial order line processing
-    
-    # 
-
-    return None
-
-    
-
-    # # Fetch customer information
-    # c_discount, c_last, c_credit = db.execute(
-    #     "SELECT c_discount, c_last, c_credit FROM customer_info WHERE c_w_id = ? AND c_d_id = ? AND c_id = ?", 
-    #     (w_id, d_id, c_id)
-    # ).fetchone()
-
-    # # Prepare item information lookup
-    # item_id_to_item_info = {}
-    # for ol in orderline_inputs:
-    #     price, name = db.execute("SELECT i_price, i_name FROM items WHERE i_id = ?", (ol.ItemId,)).fetchone()
-    #     dist_info = db.execute(f"SELECT s_dist_{d_id:02d} FROM stock_info_by_district WHERE s_w_id = ? AND s_i_id = ?", (w_id, ol.ItemId)).fetchone()[0]
-    #     item_id_to_item_info[ol.ItemId] = ItemInfo(price, name, dist_info)
-
-    
-
-    
-
-    # # Log the final result
-    # sb = []
-    # sb.append(f"c_w_id: {w_id}, c_d_id: {d_id}, c_id: {c_id}, c_last: {c_last}, c_credit: {c_credit}, c_discount: {c_discount}")
-    # sb.append(f"o_id: {next_order_id}, o_entry_d: {entry_time}")
-    # sb.append(f"num_items: {num_items}, total_amount: {total_amount}")
-    # for ol in orderline_outputs:
-    #     sb.append(f"item_number: {ol.ItemId}, i_name: {ol.Name}, supplier_warehouse: {ol.SupplyWid}, quantity: {ol.OrderlineQuantity}, ol_amount: {ol.ItemAmount}, s_quantity: {ol.Quantity}")
-    
-    # logs.info("\n".join(sb))
-
-
-# def retry(transaction_function):
-#     """
-#     Dummy retry logic. This should be replaced with actual retry logic.
-#     """
-#     try:
-#         transaction_function()
-#     except Exception as e:
-#         print(f"Retry failed: {e}")
-#         # Implement actual retry logic or handling
-#     return
