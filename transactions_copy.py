@@ -193,7 +193,109 @@ class Transactions:
 
     # 2.2 payment transaction
     def payment_txn(self, c_w_id, c_d_id, c_id, payment):
-        return
+        """
+        Processes a payment made by a customer and updates the warehouse, district, and customer information accordingly.
+
+        Args:
+            c_w_id (int): Warehouse ID of the customer
+            c_d_id (int): District ID of the customer
+            c_id (int): Customer ID
+            payment (float): Payment amount
+
+        Output:
+            - Updated customer, warehouse, and district information
+            - Customer details (ID, name, address, phone, credit info, balance)
+            - Warehouse address
+            - District address
+            - Payment amount
+        """
+        try:
+            self.cursor.execute("BEGIN")
+
+            # Step 1: Update the warehouse by incrementing W_YTD by PAYMENT
+            self.cursor.execute("""
+                UPDATE warehouse 
+                SET w_ytd = w_ytd + %s 
+                WHERE w_id = %s
+            """, (payment, c_w_id))
+
+            # Step 2: Update the district by incrementing D_YTD by PAYMENT
+            self.cursor.execute("""
+                UPDATE district 
+                SET d_ytd = d_ytd + %s 
+                WHERE d_w_id = %s AND d_id = %s
+            """, (payment, c_w_id, c_d_id))
+
+            # Step 3: Update the customer as follows:
+            # Decrement C_BALANCE, Increment C_YTD_PAYMENT, Increment C_PAYMENT_CNT
+            self.cursor.execute("""
+                UPDATE customer 
+                SET c_balance = c_balance - %s, 
+                    c_ytd_payment = c_ytd_payment + %s, 
+                    c_payment_cnt = c_payment_cnt + 1
+                WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s
+            """, (payment, payment, c_w_id, c_d_id, c_id))
+
+            # Retrieve the updated customer information
+            self.cursor.execute("""
+                SELECT c_w_id, c_d_id, c_id, c_first, c_middle, c_last, 
+                    c_street_1, c_street_2, c_city, c_state, c_zip, 
+                    c_phone, c_since, c_credit, c_credit_lim, 
+                    c_discount, c_balance
+                FROM customer
+                WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s
+            """, (c_w_id, c_d_id, c_id))
+            customer_info = self.cursor.fetchone()
+
+            # Retrieve the warehouse address
+            self.cursor.execute("""
+                SELECT w_street_1, w_street_2, w_city, w_state, w_zip
+                FROM warehouse
+                WHERE w_id = %s
+            """, (c_w_id,))
+            warehouse_info = self.cursor.fetchone()
+
+            # Retrieve the district address
+            self.cursor.execute("""
+                SELECT d_street_1, d_street_2, d_city, d_state, d_zip
+                FROM district
+                WHERE d_w_id = %s AND d_id = %s
+            """, (c_w_id, c_d_id))
+            district_info = self.cursor.fetchone()
+
+            self.cursor.execute("COMMIT")
+
+            # Output the payment transaction details
+            print("Customer Information:")
+            print(f"ID: ({customer_info[0]}, {customer_info[1]}, {customer_info[2]})")
+            print(f"Name: {customer_info[3]} {customer_info[4]} {customer_info[5]}")
+            print(f"Address: {customer_info[6]}, {customer_info[7]}, {customer_info[8]}, {customer_info[9]}, {customer_info[10]}")
+            print(f"Phone: {customer_info[11]}")
+            print(f"Since: {customer_info[12]}")
+            print(f"Credit: {customer_info[13]}")
+            print(f"Credit Limit: {customer_info[14]}")
+            print(f"Discount: {customer_info[15]}")
+            print(f"Balance: {customer_info[16]}")
+
+            print("Warehouse Address:")
+            print(f"{warehouse_info[0]}, {warehouse_info[1]}, {warehouse_info[2]}, {warehouse_info[3]}, {warehouse_info[4]}")
+
+            print("District Address:")
+            print(f"{district_info[0]}, {district_info[1]}, {district_info[2]}, {district_info[3]}, {district_info[4]}")
+
+            print(f"Payment Amount: {payment}")
+
+            return {
+                "customer_info": customer_info,
+                "warehouse_info": warehouse_info,
+                "district_info": district_info,
+                "payment_amount": payment
+            }
+
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(f"An error occurred: {error}")
+            self.cursor.execute("ROLLBACK")
+            return None
 
     # 2.3 delivery transaction
     def delivery_txn(self, w_id, carrier_id):
@@ -271,7 +373,77 @@ class Transactions:
 
     # 2.4 order-status transaction
     def order_status_txn(self, c_w_id, c_d_id, c_id):
-        return
+        """
+        Queries the status of the last order of a customer.
+
+        Args:
+            c_w_id (int): Customer's warehouse ID
+            c_d_id (int): Customer's district ID
+            c_id (int): Customer's ID
+
+        Output:
+            - Customer's name (C_FIRST, C_MIDDLE, C_LAST), balance (C_BALANCE)
+            - Last order details (O_ID, O_ENTRY_D, O_CARRIER_ID)
+            - Item details in the last order (OL_I_ID, OL_SUPPLY_W_ID, OL_QUANTITY, OL_AMOUNT, OL_DELIVERY_D)
+        """
+        try:
+            self.cursor.execute("BEGIN")
+
+            # Step 1: Get customer name and balance
+            self.cursor.execute("""
+                SELECT c_first, c_middle, c_last, c_balance
+                FROM customer
+                WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s
+            """, (c_w_id, c_d_id, c_id))
+            customer_info = self.cursor.fetchone()
+
+            if not customer_info:
+                print(f"Customer with ID ({c_w_id}, {c_d_id}, {c_id}) not found.")
+                self.cursor.execute("ROLLBACK")
+                return None
+
+            print(f"Customer: {customer_info[0]} {customer_info[1]} {customer_info[2]}, Balance: {customer_info[3]}")
+
+            # Step 2: Get the last order of the customer
+            self.cursor.execute("""
+                SELECT o_id, o_entry_d, o_carrier_id
+                FROM "order"
+                WHERE o_w_id = %s AND o_d_id = %s AND o_c_id = %s
+                ORDER BY o_entry_d DESC LIMIT 1
+            """, (c_w_id, c_d_id, c_id))
+            last_order = self.cursor.fetchone()
+
+            if not last_order:
+                print("No orders found for this customer.")
+                self.cursor.execute("ROLLBACK")
+                return None
+
+            print(f"Last Order ID: {last_order[0]}, Entry Date: {last_order[1]}, Carrier ID: {last_order[2]}")
+
+            # Step 3: Get the items in the customer's last order
+            self.cursor.execute("""
+                SELECT ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_delivery_d
+                FROM order_lines
+                WHERE ol_w_id = %s AND ol_d_id = %s AND ol_o_id = %s
+            """, (c_w_id, c_d_id, last_order[0]))
+            order_items = self.cursor.fetchall()
+
+            # Output each item in the last order
+            for item in order_items:
+                print(f"Item ID: {item[0]}, Supply Warehouse ID: {item[1]}, Quantity: {item[2]}, Amount: {item[3]}, Delivery Date: {item[4]}")
+
+            self.cursor.execute("COMMIT")
+
+            return {
+                "customer_info": customer_info,
+                "last_order": last_order,
+                "order_items": order_items
+            }
+
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(f"An error occurred: {error}")
+            self.cursor.execute("ROLLBACK")
+            return None
 
     # 2.5 stock-level transaction
     def stock_level_txn(self, w_id, d_id, threshold, num_last_orders):
@@ -323,7 +495,99 @@ class Transactions:
 
     # 2.6 popular-item transaction
     def popular_item_txn(self, w_id, d_id, l):
-        return
+        """
+        Finds the 5 most popular items in the last L orders at a specified warehouse district.
+
+        Args:
+            w_id (int): Warehouse ID
+            d_id (int): District ID
+            l (int): Number of last orders to be examined
+
+        Output:
+            - District identifier (W_ID, D_ID)
+            - Number of last orders to be examined (L)
+            - For each item in P (most to least popular):
+                a. Item number I_ID
+                b. Name I_NAME
+                c. Price I_PRICE
+                d. Total quantity x.total_qty
+                e. Number of orders x.num_orders
+        """
+        try:
+            self.cursor.execute("BEGIN")
+
+            # Step 1: Get the next available order number for the district
+            self.cursor.execute("""
+                SELECT d_next_o_id 
+                FROM district 
+                WHERE d_w_id = %s AND d_id = %s
+            """, (w_id, d_id))
+            next_order_id = self.cursor.fetchone()[0]
+
+            # Step 2: Get the set of last L orders
+            self.cursor.execute("""
+                SELECT o_id
+                FROM "order"
+                WHERE o_w_id = %s AND o_d_id = %s
+                AND o_id >= %s AND o_id < %s
+            """, (w_id, d_id, next_order_id - l, next_order_id))
+            last_order_ids = [row[0] for row in self.cursor.fetchall()]
+
+            if not last_order_ids:
+                print("No orders found.")
+                self.cursor.execute("ROLLBACK")
+                return None
+
+            # Step 3: Get the set of all items contained in the last L orders
+            self.cursor.execute("""
+                SELECT ol_i_id, SUM(ol_quantity) as total_qty, COUNT(DISTINCT ol_o_id) as num_orders
+                FROM order_lines
+                WHERE ol_w_id = %s AND ol_d_id = %s AND ol_o_id = ANY(%s)
+                GROUP BY ol_i_id
+            """, (w_id, d_id, last_order_ids))
+            item_data = self.cursor.fetchall()
+
+            if not item_data:
+                print("No items found in the last orders.")
+                self.cursor.execute("ROLLBACK")
+                return None
+
+            # Step 4: Get the top 5 most popular items based on total quantity and number of orders
+            # Sorting by total_qty, then num_orders, and finally by item ID in case of ties
+            item_data_sorted = sorted(item_data, key=lambda x: (-x[1], -x[2], x[0]))[:5]
+
+            # Fetch item details (name and price)
+            item_details = []
+            for item in item_data_sorted:
+                self.cursor.execute("""
+                    SELECT i_name, i_price
+                    FROM item
+                    WHERE i_id = %s
+                """, (item[0],))
+                item_info = self.cursor.fetchone()
+                item_details.append({
+                    'i_id': item[0],
+                    'i_name': item_info[0],
+                    'i_price': item_info[1],
+                    'total_qty': item[1],
+                    'num_orders': item[2]
+                })
+
+            self.cursor.execute("COMMIT")
+
+            # Output the popular items
+            print(f"District: (W_ID: {w_id}, D_ID: {d_id}), Last {l} Orders")
+            for idx, item in enumerate(item_details):
+                print(f"{idx + 1}. Item ID: {item['i_id']}, Name: {item['i_name']}, Price: {item['i_price']}")
+                print(f"   Total Quantity: {item['total_qty']}, Number of Orders: {item['num_orders']}")
+                print("------------------------------------------------------")
+
+            return item_details
+
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(f"An error occurred: {error}")
+            self.cursor.execute("ROLLBACK")
+            return None
 
     # 2.7 top-balance transcations
     def top_balance_txn(self):
@@ -408,4 +672,71 @@ class Transactions:
 
     # 2.8 related-customer transactions
     def related_customer_txn(self, c_w_id, c_d_id, c_id):
-        return
+        """
+        Finds all the customers who are related to a specific customer based on the following criteria:
+        1. Both customers are located in the same state.
+        2. There are at least two items in common between the given customer's last order and the other customer's last order.
+        
+        Args:
+            c_w_id (int): Warehouse ID of the given customer
+            c_d_id (int): District ID of the given customer
+            c_id (int): Customer ID of the given customer
+
+        Output:
+            For each related customer, return customer identifiers (C_W_ID, C_D_ID, C_ID)
+            and for each customer, return the identifiers (C_W_ID, C_D_ID, C_ID) of each related customer.
+        """
+        try:
+            self.cursor.execute("BEGIN")
+
+            # Step 1: Get the state of the given customer
+            self.cursor.execute("SELECT c_state_id FROM customer WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s", 
+                                (c_w_id, c_d_id, c_id))
+            customer_state_id = self.cursor.fetchone()[0]
+
+            # Step 2: Get the last order for the given customer
+            self.cursor.execute("""
+                SELECT o_id 
+                FROM "order" 
+                WHERE o_w_id = %s AND o_d_id = %s AND o_c_id = %s 
+                ORDER BY o_entry_d DESC LIMIT 1
+                """, (c_w_id, c_d_id, c_id))
+            customer_last_order_id = self.cursor.fetchone()[0]
+
+            # Step 3: Get the item IDs from the last order of the given customer
+            self.cursor.execute("""
+                SELECT ol_i_id 
+                FROM order_lines 
+                WHERE ol_w_id = %s AND ol_d_id = %s AND ol_o_id = %s
+                """, (c_w_id, c_d_id, customer_last_order_id))
+            customer_item_ids = [row[0] for row in self.cursor.fetchall()]
+
+            # Step 4: Find related customers in the same state who have at least two items in common in their last order
+            self.cursor.execute("""
+                SELECT DISTINCT c2.c_w_id, c2.c_d_id, c2.c_id 
+                FROM customer c1
+                JOIN customer c2 ON c1.c_state_id = c2.c_state_id
+                JOIN "order" o1 ON o1.o_w_id = c1.c_w_id AND o1.o_d_id = c1.c_d_id AND o1.o_c_id = c1.c_id
+                JOIN "order" o2 ON o2.o_w_id = c2.c_w_id AND o2.o_d_id = c2.c_d_id AND o2.o_c_id = c2.c_id
+                JOIN order_lines ol1 ON ol1.ol_w_id = o1.o_w_id AND ol1.ol_d_id = o1.o_d_id AND ol1.ol_o_id = o1.o_id
+                JOIN order_lines ol2 ON ol2.ol_w_id = o2.o_w_id AND ol2.ol_d_id = o2.ol_d_id AND ol2.ol_o_id = o2.o_id
+                WHERE c1.c_state_id = %s AND c1.c_w_id = %s AND c1.c_d_id = %s AND c1.c_id = %s
+                AND ol1.ol_i_id = ol2.ol_i_id
+                GROUP BY c2.c_w_id, c2.c_d_id, c2.c_id
+                HAVING COUNT(ol1.ol_i_id) >= 2
+            """, (customer_state_id, c_w_id, c_d_id, c_id))
+
+            related_customers = self.cursor.fetchall()
+
+            # Output the related customers
+            for related_customer in related_customers:
+                print(f"Related Customer: Warehouse ID: {related_customer[0]}, District ID: {related_customer[1]}, Customer ID: {related_customer[2]}")
+
+            self.cursor.execute("COMMIT")
+
+            return related_customers
+
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(f"An error occurred: {error}")
+            self.cursor.execute("ROLLBACK")
+            return None
