@@ -118,6 +118,7 @@ class Transactions:
             orderline_outputs = []
 
             # retrieve item prices
+            # TODO: Possible bug in ANY(%s)
             self.cursor.execute("SELECT I_PRICE, I_NAME FROM item WHERE I_ID = ANY(%s)", (item_ids,))
             result = self.cursor.fetchall()
             item_prices = [round(float(x[0]), 2) for x in result]
@@ -326,7 +327,84 @@ class Transactions:
 
     # 2.7 top-balance transcations
     def top_balance_txn(self):
-        return
+        """
+        Handles the top balance transaction that finds the top-10 customers ranked in non-ascending order of their outstanding balance.
+
+        Output:
+            For each of the top 10 customers ranked in non-ascending order of C_BALANCE:
+            a. Name of customer (C_FIRST, C_MIDDLE, C_LAST)
+            b. Balance of customer's outstanding payment (C_BALANCE)
+            c. Warehouse name (W_NAME)
+            d. District name (D_NAME)
+        """
+        try:
+            # self.cursor.execute("BEGIN")
+
+            # Step 1: Get the top 10 customers by balance in non-ascending order
+            # NOTE: This query is SLOW AF - to be optimized later
+            self.cursor.execute("""
+                SELECT 
+                    C_FIRST, C_MIDDLE, C_LAST, C_BALANCE, 
+                    C_W_ID, C_D_ID
+                FROM customer 
+                JOIN warehouse ON customer.c_w_id = warehouse.w_id 
+                JOIN district ON customer.c_d_id = district.d_id 
+                ORDER BY C_BALANCE DESC 
+                LIMIT 10
+            """)
+            
+            top_customers = self.cursor.fetchall()
+            c_w_ids = [row[4] for row in top_customers]
+            c_d_ids = [row[5] for row in top_customers]
+
+            warehouse_query = """
+                WITH warehouse_ids AS (
+                    SELECT unnest(%s::int[]) AS w_id, generate_subscripts(%s::int[], 1) AS ord
+                )
+                SELECT w.w_name
+                FROM warehouse w
+                JOIN warehouse_ids wi ON w.w_id = wi.w_id
+                ORDER BY wi.ord;
+            """
+            self.cursor.execute(warehouse_query, (c_w_ids, c_w_ids))
+            warehouse_names = [row[0] for row in self.cursor.fetchall()]
+
+            # Step 3: Query for district names similarly
+            district_query = """
+                WITH district_ids AS (
+                    SELECT unnest(%s::int[]) AS d_id, unnest(%s::int[]) AS w_id, generate_subscripts(%s::int[], 1) AS ord
+                )
+                SELECT d.d_name
+                FROM district d
+                JOIN district_ids di ON d.d_id = di.d_id AND d.d_w_id = di.w_id
+                ORDER BY di.ord;
+            """
+            self.cursor.execute(district_query, (c_d_ids, c_w_ids, c_w_ids))
+            district_names = [row[0] for row in self.cursor.fetchall()]
+
+            # Output the details of each customer
+            # for customer in top_customers:
+            #     c_first = customer[0]
+            #     c_middle = customer[1]
+            #     c_last = customer[2]
+            #     c_balance = customer[3]
+            #     w_name = customer[]
+            #     d_name = customer[5]
+                
+                # print(f"Customer: {c_first} {c_middle} {c_last}")
+                # print(f"Outstanding Balance: {c_balance}")
+                # print(f"Warehouse Name: {w_name}")
+                # print(f"District Name: {d_name}")
+                # print("----------------------------------")
+
+            # self.cursor.execute("COMMIT")
+
+            return None
+
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(f"An error occurred: {error}")
+            self.cursor.execute("ROLLBACK")
+            return None
 
     # 2.8 related-customer transactions
     def related_customer_txn(self, c_w_id, c_d_id, c_id):
