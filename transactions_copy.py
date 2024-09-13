@@ -89,7 +89,7 @@ class Transactions:
             quantities (List[int]): List of quantities for each item
         """
         try:
-            self.cursor.execute("BEGIN")
+            # self.cursor.execute("BEGIN")
 
             orderline_inputs = []
             for i in range(num_items):
@@ -116,7 +116,6 @@ class Transactions:
             # Update stock and calculate total amount
             total_amount = 0
             orderline_outputs = []
-            stock_deltas = []
 
             # retrieve item prices
             self.cursor.execute("SELECT I_PRICE, I_NAME FROM item WHERE I_ID = ANY(%s)", (item_ids,))
@@ -189,15 +188,85 @@ class Transactions:
         except (Exception, psycopg2.DatabaseError) as error:
             print(f"An error occurred: {error}")
             self.cursor.execute("ROLLBACK")
-        return
+        return None
 
     # 2.2 payment transaction
     def payment_txn(self, c_w_id, c_d_id, c_id, payment):
         return
 
     # 2.3 delivery transaction
-    def delivery_txn(self, w_id, CARRIER_ID):
-        return
+    def delivery_txn(self, w_id, carrier_id):
+        """
+        Handles a delivery transaction.
+
+        Args:
+            w_id (int): Warehouse ID
+            carrier_id (int): Carrier ID
+        """
+        try:
+            # self.cursor.execute("BEGIN")
+
+            # Process steps for district numbers 1 through 10
+            for district_no in range(1, 11):
+
+                # Step 1a: Find the smallest order number O_ID for the district with O_CARRIER_ID = null
+                self.cursor.execute("""
+                    SELECT MIN(o_id) 
+                    FROM "order" 
+                    WHERE o_w_id = %s AND o_d_id = %s AND o_carrier_id IS NULL
+                    """, (w_id, district_no))
+                next_order_id = self.cursor.fetchone()
+
+                if next_order_id is None or next_order_id[0] is None:
+                    # If no valid order is found, continue to the next district
+                    continue
+
+                next_order_id = next_order_id[0]
+                
+                # Step 1b: Find the customer who placed the order
+                self.cursor.execute("""
+                    SELECT o_c_id 
+                    FROM "order" 
+                    WHERE o_w_id = %s AND o_d_id = %s AND o_id = %s
+                    """, (w_id, district_no, next_order_id))
+                customer_id = self.cursor.fetchone()[0]
+
+                # Step 1b: Update the order by setting O_CARRIER_ID
+                self.cursor.execute("""
+                    UPDATE "order" 
+                    SET o_carrier_id = %s 
+                    WHERE o_w_id = %s AND o_d_id = %s AND o_id = %s
+                    """, (carrier_id, w_id, district_no, next_order_id))
+                
+                # Step 1c: Update all the order lines for this order by setting OL_DELIVERY_D to the current date and time
+                delivery_time = datetime.now(timezone.utc)
+                self.cursor.execute("""
+                    UPDATE "order-line" 
+                    SET ol_delivery_d = %s 
+                    WHERE ol_w_id = %s AND ol_d_id = %s AND ol_o_id = %s
+                    """, (delivery_time, w_id, district_no, next_order_id))
+
+                # Step 1d: Calculate the total amount from all order lines for this order
+                self.cursor.execute("""
+                    SELECT SUM(ol_amount) 
+                    FROM "order-line" 
+                    WHERE ol_w_id = %s AND ol_d_id = %s AND ol_o_id = %s
+                    """, (w_id, district_no, next_order_id))
+                total_amount = self.cursor.fetchone()[0]
+                
+                
+                # Step 1d: Update the customer balance and increment the delivery count
+                self.cursor.execute("""
+                    UPDATE customer_param 
+                    SET c_balance = c_balance + %s, c_delivery_cnt = c_delivery_cnt + 1 
+                    WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s
+                    """, (total_amount, w_id, district_no, customer_id))
+
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(f"An error occurred: {error}")
+            self.cursor.execute("ROLLBACK")
+
+        return None
 
     # 2.4 order-status transaction
     def order_status_txn(self, c_w_id, c_d_id, c_id):
