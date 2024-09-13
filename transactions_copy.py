@@ -273,8 +273,52 @@ class Transactions:
         return
 
     # 2.5 stock-level transaction
-    def stock_level_txn(self, w_id, d_id, t, l):
-        return
+    def stock_level_txn(self, w_id, d_id, threshold, num_last_orders):
+        """
+        Handles a stock level transaction that examines the items from the last L orders at a specified warehouse district 
+        and reports the number of items that have a stock level below a specified threshold.
+
+        Args:
+            w_id (int): Warehouse ID
+            d_id (int): District ID
+            threshold (int): Stock level threshold T
+            num_last_orders (int): Number of last orders to be examined L
+        """
+        try:
+            # self.cursor.execute("BEGIN")
+
+            # Step 1: Get the next available order number for the district
+            self.cursor.execute("SELECT d_next_o_id FROM district WHERE d_w_id = %s AND d_id = %s", (w_id, d_id))
+            next_order_id = self.cursor.fetchone()[0]
+
+            # Step 2: Get the set of items from the last L orders
+            self.cursor.execute("""
+                SELECT DISTINCT ol_i_id
+                FROM "order-line"
+                WHERE ol_w_id = %s AND ol_d_id = %s AND ol_o_id >= %s AND ol_o_id < %s
+                """, (w_id, d_id, next_order_id - num_last_orders, next_order_id))
+            item_ids = [row[0] for row in self.cursor.fetchall()]
+
+            if not item_ids:
+                print("No items found in the last orders.")
+                return 0
+
+            # Step 3: Check stock levels for the items and count how many are below the threshold
+            query = "SELECT COUNT(*) FROM stock WHERE s_w_id = %s AND s_i_id = ANY(%s) AND s_quantity < %s"
+            self.cursor.execute(query, (w_id, item_ids, threshold))
+            low_stock_count = self.cursor.fetchone()[0]
+
+            # Output the total number of items in S where the stock quantity is below the threshold
+            print(f"Number of items below threshold: {low_stock_count}")
+
+            # self.cursor.execute("COMMIT")
+
+            return low_stock_count
+
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(f"An error occurred: {error}")
+            self.cursor.execute("ROLLBACK")
+            return 0
 
     # 2.6 popular-item transaction
     def popular_item_txn(self, w_id, d_id, l):
