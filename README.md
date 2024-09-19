@@ -39,6 +39,10 @@ postgres=# SELECT name, cost_model, state, monthly_budget FROM campaigns WHERE c
  Lyja                          | cost_per_click      | archived |           2369
 (9 rows)
 ```
+- Note to change the following line in `Dockerfile` from `setup/tutorials/` to `setup/CS4224/` to initialise the database with actual data
+```
+COPY setup/tutorials/ .
+```
 - Note to delete exited containers if you encounter an error that says docker container with name citus exist
 ```
 docker container prune
