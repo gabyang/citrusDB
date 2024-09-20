@@ -1,3 +1,5 @@
 .env
 __pycache__
 citrus-venv
+/setup/tutorials
+/setup/CS4224/*.csv
