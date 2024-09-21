@@ -1,0 +1,32 @@
+version: "3"
+
+services:
+  master:
+    container_name: "${COMPOSE_PROJECT_NAME:-citus}_master"
+    image: "jwhiteatdocker/citus:12.0.0-pg14"
+    ports: ["5432:5432"]
+    labels:
+      - "com.citusdata.role=Master"
+      - "com.citusdata.role=Worker"
+    environment: &AUTH
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      PGUSER: "${POSTGRES_USER}"
+      PGPASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_HOST_AUTH_METHOD: "${POSTGRES_HOST_AUTH_METHOD:-trust}"
+    volumes:
+      - master-data:/var/lib/postgresql/data
+  
+  worker:
+    image: "jwhiteatdocker/citus:12.0.0-pg14"
+    labels:
+      - "com.citusdata.role=Worker"
+    depends_on:
+      - master
+    environment: *AUTH
+    volumes:
+      - worker-data:/var/lib/postgresql/data
+
+volumes:
+  master-data:
+  worker-data:

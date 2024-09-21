@@ -1,21 +1,55 @@
-# citrusDB
-🍋🍋🍋
+# Project DistribuShop
+An e-commerce application for processing transactions and distributing data in a sharded database using CitusDB.
 
-# Setup CitusDB (Docker)
-- Run the bash script to build the docker image with the csv and sql files, and start the container
+# First Time Setup CitusDB (Docker)
+
+Run docker-compose to build image with 5 nodes. 1 master and 4 worker nodes.
 ```
-build.sh
+docker-compose up -d --scale worker=4
 ```
-- Open another terminal and access the docker container
+
+### Understanding the role of the master and worker nodes:
+#### Master Node (Coordinator)
+**Role:** The master node acts as the coordinator in a Citus cluster. It's the entry point for all client connections and queries.
+**Function:** It holds metadata about the distributed tables, plans queries, and dispatches them to the worker nodes.
+**Data Storage:** By default, the master node doesn't store data of distributed tables; it only stores metadata and handles query planning.
+
+#### Worker Nodes
+**Role:** Worker nodes store the actual data of the distributed tables.
+**Function:** They execute the parts of queries dispatched by the master node, handling data storage and processing.
+**Data Storage:** Each worker node stores shards (partitions) of the distributed tables.
+
+**Note:** 
+Since we aren't using the manager node, we need to manually register each worker node with the master.
+
+
+### Connect to the Master Node
 ```
-docker exec -it citus bash
+docker exec -it citus_master psql -U postgres
 ```
-- Check the following files exist
+
+Register Master and Workers:
 ```
-root@e90f226887ac:/app# ls
-ads.csv  campaigns.csv	clicks.csv  companies.csv  geo_ips.csv	impressions.csv  init.sh  schema.sql
+-- Once Connected to the master node's PostgreSQL instance
+SELECT master_add_node('master', 5432);
+SELECT master_add_node('worker_1', 5432);
+SELECT master_add_node('worker_2', 5432);
+SELECT master_add_node('worker_3', 5432);
+SELECT master_add_node('worker_4', 5432);
 ```
-- Run the bash script to create the tables and seed the data into each table
+Note: The hostnames worker_1, worker_2, etc., are automatically assigned by Docker when scaling services. Ensure these match your actual container hostnames.
+Register the Master as a Worker (if not already done):
+
+### Verify the Cluster Setup
+After registering the nodes, verify that all nodes are active:
+```
+SELECT * FROM master_get_active_worker_nodes();
+```
+This should list all worker nodes, including the master.
+
+### Set up distributed schema and data
+
+Run the bash script to create the tables and seed the data into each table
 ```
 bash init.sh
 ```
@@ -39,11 +73,8 @@ postgres=# SELECT name, cost_model, state, monthly_budget FROM campaigns WHERE c
  Lyja                          | cost_per_click      | archived |           2369
 (9 rows)
 ```
-- Note to change the following line in `Dockerfile` from `setup/tutorials/` to `setup/CS4224/` to initialise the database with actual data
-```
-COPY setup/tutorials/ .
-```
-- Note to delete exited containers if you encounter an error that says docker container with name citus exist
+
+**Note:** to delete exited containers if you encounter an error that says docker container with name citus exist
 ```
 docker container prune
 ```
