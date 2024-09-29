@@ -1,9 +1,11 @@
-psql -U postgres -d postgres < schema.sql
+#!/bin/bash
 
-psql -U postgres -d postgres -c "\\copy warehouse from 'warehouse.csv' with csv header"
-psql -U postgres -d postgres -c "\\copy district from 'district.csv' with csv header"
-psql -U postgres -d postgres -c "\\copy customer from 'customer.csv' with csv header"
-psql -U postgres -d postgres -c "\\copy \"order\" from 'order.csv' with csv header null 'null'"
-psql -U postgres -d postgres -c "\\copy item from 'item.csv' with csv header"
-psql -U postgres -d postgres -c "\\copy \"order-line\" from 'order-line.csv' with csv header null 'null'"
-psql -U postgres -d postgres -c "\\copy stock from 'stock.csv' with csv header"
+# Define the Docker container name
+CONTAINER_NAME=citus_master
+
+# Copy CSV files to the Docker container
+for dataset in warehouse district customer order item order-line stock; do
+  docker cp ${dataset}.csv citus_master:.
+done
+
+docker cp schema_modified.sql citus_master:.

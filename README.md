@@ -31,11 +31,11 @@ docker exec -it citus_master psql -U postgres
 Register Master and Workers:
 ```
 -- Once Connected to the master node's PostgreSQL instance
-SELECT master_add_node('master', 5432);
-SELECT master_add_node('worker_1', 5432);
-SELECT master_add_node('worker_2', 5432);
-SELECT master_add_node('worker_3', 5432);
-SELECT master_add_node('worker_4', 5432);
+SELECT citus_set_coordinator_host('master', 5432);
+SELECT master_add_node('citusdb-worker-1', 5432);
+SELECT master_add_node('citusdb-worker-2', 5432);
+SELECT master_add_node('citusdb-worker-3', 5432);
+SELECT master_add_node('citusdb-worker-4', 5432);
 ```
 Note: The hostnames worker_1, worker_2, etc., are automatically assigned by Docker when scaling services. Ensure these match your actual container hostnames.
 Register the Master as a Worker (if not already done):
@@ -49,29 +49,26 @@ This should list all worker nodes, including the master.
 
 ### Set up distributed schema and data
 
-Run the bash script to create the tables and seed the data into each table
+- Create the schema
+```sql
+\i schema_modified.sql
 ```
-bash init.sh
+
+- Populate the data into the tables
+```sql
+\copy warehouse from '/warehouse.csv' with csv header
+\copy district from '/district.csv' with csv header
+\copy customer from '/customer.csv' with csv header
+\copy "order" from '/order.csv' with csv header null 'null'
+\copy item from '/item.csv' with csv header
+\copy stock from '/stock.csv' with csv header
+\copy "order-line" from '/order-line.csv' with csv header null 'null'
 ```
-- Run the following command to access postgres shell 
-```
-psql -U postgres
-```
-- Check the following query give the same output
-```
-postgres=# SELECT name, cost_model, state, monthly_budget FROM campaigns WHERE company_id = 5 ORDER BY monthly_budget DESC LIMIT 10;
-             name              |     cost_model      |  state   | monthly_budget 
--------------------------------+---------------------+----------+----------------
- Captain Annihilus             | cost_per_click      | archived |           9352
- Supah Scorpion Wolf           | cost_per_impression | running  |           7420
- Dark Groot Boy                | cost_per_impression | running  |           6496
- Supah Bat Lord                | cost_per_impression | archived |           4307
- Giant Toxin Girl              | cost_per_click      | running  |           4057
- Shocker                       | cost_per_impression | paused   |           3914
- Giant Maya Herrera I          | cost_per_click      | archived |           3712
- Agent Rachel Pirzad of Hearts | cost_per_click      | archived |           3538
- Lyja                          | cost_per_click      | archived |           2369
-(9 rows)
+- Create distributed tables
+```sql
+select * from master_get_active_worker_nodes(); -- Check if the worker nodes are active and connected
+SELECT create_distributed_table('warehouse', 'w_id');
+SELECT * FROM pg_dist_shard_placement; -- Check the data is placed in which shard
 ```
 
 **Note:** to delete exited containers if you encounter an error that says docker container with name citus exist
