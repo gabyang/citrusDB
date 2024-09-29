@@ -1,7 +1,7 @@
 # Project DistribuShop
 An e-commerce application for processing transactions and distributing data in a sharded database using CitusDB.
 
-# First Time Setup CitusDB (Docker)
+# First Time Local Setup CitusDB (Docker)
 
 Run docker-compose to build image with 5 nodes. 1 master and 4 worker nodes.
 ```
@@ -25,33 +25,33 @@ Since we aren't using the manager node, we need to manually register each worker
 
 ### Connect to the Master Node
 ```
-docker exec -it citus_master psql -U postgres
+docker exec -it <COMPOSE_PROJECT_NAME>_master <container_id> bash
+psql -U <postgres_user> -h localhost
 ```
 
 Register Master and Workers:
 ```
 -- Once Connected to the master node's PostgreSQL instance
 SELECT citus_set_coordinator_host('master', 5432);
-SELECT master_add_node('citusdb-worker-1', 5432);
-SELECT master_add_node('citusdb-worker-2', 5432);
-SELECT master_add_node('citusdb-worker-3', 5432);
-SELECT master_add_node('citusdb-worker-4', 5432);
+SELECT master_add_node('worker-1', 5432);
+SELECT master_add_node('worker-2', 5432);
+SELECT master_add_node('worker-3', 5432);
+SELECT master_add_node('worker-4', 5432);
 ```
 Note: The hostnames worker_1, worker_2, etc., are automatically assigned by Docker when scaling services. Ensure these match your actual container hostnames.
-Register the Master as a Worker (if not already done):
 
 ### Verify the Cluster Setup
 After registering the nodes, verify that all nodes are active:
 ```
 SELECT * FROM master_get_active_worker_nodes();
 ```
-This should list all worker nodes, including the master.
+This should list all worker nodes.
 
 ### Set up distributed schema and data
 
 - Create the schema
 ```sql
-\i schema_modified.sql
+\i schema.sql
 ```
 
 - Populate the data into the tables
