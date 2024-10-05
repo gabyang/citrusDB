@@ -53,6 +53,7 @@ CREATE TABLE customer (
 	PRIMARY KEY (C_W_ID, C_D_ID, C_ID),
 	FOREIGN KEY (C_W_ID, C_D_ID) REFERENCES District(D_W_ID, D_ID)
 );
+SELECT create_distributed_table('customer', 'c_w_id', colocate_with => 'warehouse');
 
 CREATE TABLE "order" (
     O_W_ID INT,
@@ -67,6 +68,7 @@ CREATE TABLE "order" (
     FOREIGN KEY (O_W_ID, O_D_ID, O_C_ID) REFERENCES Customer(C_W_ID, C_D_ID, C_ID),
     CHECK (O_CARRIER_ID IS NULL OR (O_CARRIER_ID BETWEEN 1 AND 10))
 );
+SELECT create_distributed_table('order', 'o_w_id', colocate_with => 'warehouse');
 
 CREATE TABLE item (
     I_ID INT PRIMARY KEY,
@@ -75,6 +77,7 @@ CREATE TABLE item (
     I_IM_ID INT,
     I_DATA VARCHAR(50)
 );
+SELECT create_distributed_table('item', 'i_id');
 
 CREATE TABLE "order-line" (
     OL_W_ID INT,
@@ -91,6 +94,7 @@ CREATE TABLE "order-line" (
     FOREIGN KEY (OL_W_ID, OL_D_ID, OL_O_ID) REFERENCES "order"(O_W_ID, O_D_ID, O_ID),
     FOREIGN KEY (OL_I_ID) REFERENCES Item(I_ID)
 );
+-- SELECT create_distributed_table('order-line', 'ol_w_id', colocate_with => 'warehouse');
 
 CREATE TABLE Stock (
     S_W_ID INT,
@@ -114,3 +118,4 @@ CREATE TABLE Stock (
     FOREIGN KEY (S_W_ID) REFERENCES Warehouse(W_ID),
     FOREIGN KEY (S_I_ID) REFERENCES Item(I_ID)
 );
+-- SELECT create_distributed_table('stock', 's_w_id', colocate_with => 'warehouse');
