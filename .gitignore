@@ -1,5 +1,5 @@
 .env
+.DS_Store
 __pycache__
 citrus-venv
-/setup/tutorials
-/setup/CS4224/*.csv
+/setup/*/project_files/*
