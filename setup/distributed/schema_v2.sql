@@ -1,3 +1,5 @@
+-- Split table and enforce contrainsts in separate tables
+
 CREATE TABLE warehouse (
 	W_ID INT PRIMARY KEY,
 	W_NAME VARCHAR(10),
@@ -92,9 +94,18 @@ CREATE TABLE "order-line" (
     OL_DIST_INFO CHAR(24),
     PRIMARY KEY (OL_W_ID, OL_D_ID, OL_O_ID, OL_NUMBER),
     FOREIGN KEY (OL_W_ID, OL_D_ID, OL_O_ID) REFERENCES "order"(O_W_ID, O_D_ID, O_ID)
-    -- FOREIGN KEY (OL_I_ID) REFERENCES Item(I_ID)
 );
 SELECT create_distributed_table('order-line', 'ol_w_id', colocate_with => 'warehouse');
+
+CREATE TABLE "order-line-item" (
+    OL_W_ID INT,
+    OL_D_ID INT,
+    OL_O_ID INT,
+    OL_NUMBER INT,
+    OL_I_ID INT,
+    FOREIGN KEY (OL_I_ID) REFERENCES Item(I_ID)
+);
+SELECT create_distributed_table('order-line-item', 'ol_i_id', colocate_with => 'item');
 
 CREATE TABLE Stock (
     S_W_ID INT,
@@ -116,6 +127,12 @@ CREATE TABLE Stock (
     S_DATA VARCHAR(50),
     PRIMARY KEY (S_W_ID, S_I_ID),
     FOREIGN KEY (S_W_ID) REFERENCES Warehouse(W_ID)
-    -- FOREIGN KEY (S_I_ID) REFERENCES Item(I_ID)
 );
 SELECT create_distributed_table('stock', 's_w_id', colocate_with => 'warehouse');
+
+CREATE TABLE "stock-item" (
+    S_W_ID INT,
+    S_I_ID INT,
+    FOREIGN KEY (S_I_ID) REFERENCES Item(I_ID)
+);
+SELECT create_distributed_table('stock-item', 's_i_id', colocate_with => 'item');
