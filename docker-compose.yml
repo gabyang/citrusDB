@@ -14,6 +14,8 @@ services:
       PGUSER: "${POSTGRES_USER:-postgres}"
       PGPASSWORD: "${POSTGRES_PASSWORD}"
       POSTGRES_HOST_AUTH_METHOD: "${POSTGRES_HOST_AUTH_METHOD:-trust}"
+    volumes:
+      - ./:/CS4224
   worker:
     image: "jwhiteatdocker/citus:12.0.0-pg14"
     labels: ["com.citusdata.role=Worker"]
