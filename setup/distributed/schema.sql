@@ -91,10 +91,10 @@ CREATE TABLE "order-line" (
     OL_QUANTITY DECIMAL(2, 0),
     OL_DIST_INFO CHAR(24),
     PRIMARY KEY (OL_W_ID, OL_D_ID, OL_O_ID, OL_NUMBER),
-    FOREIGN KEY (OL_W_ID, OL_D_ID, OL_O_ID) REFERENCES "order"(O_W_ID, O_D_ID, O_ID),
-    FOREIGN KEY (OL_I_ID) REFERENCES Item(I_ID)
+    FOREIGN KEY (OL_W_ID, OL_D_ID, OL_O_ID) REFERENCES "order"(O_W_ID, O_D_ID, O_ID)
+    -- FOREIGN KEY (OL_I_ID) REFERENCES Item(I_ID)
 );
--- SELECT create_distributed_table('order-line', 'ol_w_id', colocate_with => 'warehouse');
+SELECT create_distributed_table('order-line', 'ol_w_id', colocate_with => 'warehouse');
 
 CREATE TABLE Stock (
     S_W_ID INT,
@@ -115,7 +115,7 @@ CREATE TABLE Stock (
     S_DIST_10 CHAR(24),
     S_DATA VARCHAR(50),
     PRIMARY KEY (S_W_ID, S_I_ID),
-    FOREIGN KEY (S_W_ID) REFERENCES Warehouse(W_ID),
-    FOREIGN KEY (S_I_ID) REFERENCES Item(I_ID)
+    FOREIGN KEY (S_W_ID) REFERENCES Warehouse(W_ID)
+    -- FOREIGN KEY (S_I_ID) REFERENCES Item(I_ID)
 );
--- SELECT create_distributed_table('stock', 's_w_id', colocate_with => 'warehouse');
+SELECT create_distributed_table('stock', 's_w_id', colocate_with => 'warehouse');
