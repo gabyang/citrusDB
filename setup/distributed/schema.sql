@@ -9,6 +9,7 @@ CREATE TABLE warehouse (
 	W_TAX DECIMAL(4, 4),
 	W_YTD DECIMAL(12, 2)
 );
+SELECT create_distributed_table('warehouse', 'w_id');
 
 CREATE TABLE district (
 	D_W_ID INT,
@@ -25,6 +26,7 @@ CREATE TABLE district (
 	PRIMARY KEY (D_W_ID, D_ID),
 	FOREIGN KEY (D_W_ID) REFERENCES Warehouse(W_ID)
 );
+SELECT create_distributed_table('district', 'd_w_id', colocate_with => 'warehouse');
 
 CREATE TABLE customer (
 	C_W_ID INT,
