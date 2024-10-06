@@ -1,4 +1,4 @@
--- Enforce contraints in separate tables to allow distributed database schema
+-- Enforce contraints in separate tables to allow distributed database schema with vertical partitioning
 
 CREATE TABLE warehouse (
 	W_ID INT PRIMARY KEY,
@@ -13,6 +13,7 @@ CREATE TABLE warehouse (
 );
 SELECT create_distributed_table('warehouse', 'w_id');
 
+-- Apply CRUD operations on vertically partitioned tables for district to enforce contraints
 CREATE TABLE district (
 	D_W_ID INT,
 	D_ID INT,
@@ -24,30 +25,40 @@ CREATE TABLE district (
 	D_ZIP CHAR(9),
 	D_TAX DECIMAL(4, 4),
 	D_YTD DECIMAL(12, 2),
-	D_NEXT_O_ID INT,
+	-- D_NEXT_O_ID INT,
 	PRIMARY KEY (D_W_ID, D_ID),
 	FOREIGN KEY (D_W_ID) REFERENCES Warehouse(W_ID)
 );
 SELECT create_distributed_table('district', 'd_w_id', colocate_with => 'warehouse');
 
+-- For 2.5
+CREATE TABLE "district_2-5" (
+	D_W_ID INT,
+	D_ID INT,
+	D_NEXT_O_ID INT,
+	PRIMARY KEY (D_W_ID, D_ID)
+);
+SELECT create_distributed_table('district_2-5', 'd_id');
+
+-- Apply CRUD operations on vertically partitioned tables for customer to enforce contraints
 CREATE TABLE customer (
 	C_W_ID INT,
 	C_D_ID INT,
 	C_ID INT,
-	C_FIRST VARCHAR(16),
-	C_MIDDLE CHAR(2),
-	C_LAST VARCHAR(16),
+	-- C_FIRST VARCHAR(16),
+	-- C_MIDDLE CHAR(2),
+	-- C_LAST VARCHAR(16),
 	C_STREET_1 VARCHAR(20),
 	C_STREET_2 VARCHAR(20),
 	C_CITY VARCHAR(20),
-	C_STATE CHAR(2),
+	-- C_STATE CHAR(2),
 	C_ZIP CHAR(9),
 	C_PHONE CHAR(16),
 	C_SINCE TIMESTAMP,
 	C_CREDIT CHAR(2),
 	C_CREDIT_LIM DECIMAL(12, 2),
 	C_DISCOUNT DECIMAL(5, 4),
-	C_BALANCE DECIMAL(12, 2),
+	-- C_BALANCE DECIMAL(12, 2),
 	C_YTD_PAYMENT FLOAT,
 	C_PAYMENT_CNT INT,
 	C_DELIVERY_CNT INT,
@@ -56,6 +67,29 @@ CREATE TABLE customer (
 	FOREIGN KEY (C_W_ID, C_D_ID) REFERENCES District(D_W_ID, D_ID)
 );
 SELECT create_distributed_table('customer', 'c_w_id', colocate_with => 'warehouse');
+
+-- For 2.7
+CREATE TABLE "customer_2-7" (
+	C_W_ID INT,
+	C_D_ID INT,
+	C_ID INT,
+	C_FIRST VARCHAR(16),
+	C_MIDDLE CHAR(2),
+	C_LAST VARCHAR(16),
+	C_BALANCE DECIMAL(12, 2),
+	PRIMARY KEY (C_W_ID, C_D_ID, C_ID)
+);
+SELECT create_distributed_table('customer_2-7', 'c_id');
+
+-- For 2.8
+CREATE TABLE "customer2-8" (
+	C_W_ID INT,
+	C_D_ID INT,
+	C_ID INT,
+	C_STATE CHAR(2),
+	PRIMARY KEY (C_W_ID, C_D_ID, C_ID)
+);
+SELECT create_distributed_table('customer2-8', 'c_id');
 
 CREATE TABLE "order" (
     O_W_ID INT,
@@ -134,10 +168,12 @@ CREATE TABLE Stock (
 );
 SELECT create_distributed_table('stock', 's_w_id', colocate_with => 'warehouse');
 
-CREATE TABLE "stock-item-constraint" (
+-- For 2.5
+CREATE TABLE "stock_2-5" (
     S_W_ID INT,
     S_I_ID INT,
+    S_QUANTITY DECIMAL(4, 0),
     PRIMARY KEY (S_W_ID, S_I_ID),
     FOREIGN KEY (S_I_ID) REFERENCES Item(I_ID)
 );
-SELECT create_distributed_table('stock-item-constraint', 's_i_id', colocate_with => 'item');
+SELECT create_distributed_table('stock_2-5', 's_i_id', colocate_with => 'item');
