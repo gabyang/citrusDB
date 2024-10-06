@@ -1,4 +1,4 @@
--- Drop foreign key contrainsts
+-- Relax foreign key contraints to allow distributed database schema
 
 CREATE TABLE warehouse (
 	W_ID INT PRIMARY KEY,

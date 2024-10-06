@@ -1,4 +1,4 @@
--- Split table and enforce contrainsts in separate tables
+-- Enforce contraints in separate tables to allow distributed database schema with vertical partitioning
 
 CREATE TABLE warehouse (
 	W_ID INT PRIMARY KEY,
@@ -13,6 +13,7 @@ CREATE TABLE warehouse (
 );
 SELECT create_distributed_table('warehouse', 'w_id');
 
+-- Apply CRUD operations on vertically partitioned tables for district to enforce contraints
 CREATE TABLE district (
 	D_W_ID INT,
 	D_ID INT,
@@ -24,40 +25,40 @@ CREATE TABLE district (
 	D_ZIP CHAR(9),
 	D_TAX DECIMAL(4, 4),
 	D_YTD DECIMAL(12, 2),
+	-- D_NEXT_O_ID INT,
 	PRIMARY KEY (D_W_ID, D_ID),
 	FOREIGN KEY (D_W_ID) REFERENCES Warehouse(W_ID)
 );
 SELECT create_distributed_table('district', 'd_w_id', colocate_with => 'warehouse');
 
+-- For 2.5
 CREATE TABLE "district_2-5" (
 	D_W_ID INT,
 	D_ID INT,
 	D_NEXT_O_ID INT,
-	PRIMARY KEY (D_W_ID, D_ID),
-	FOREIGN KEY (D_W_ID) REFERENCES Warehouse(W_ID)
+	PRIMARY KEY (D_W_ID, D_ID)
 );
 SELECT create_distributed_table('district_2-5', 'd_id');
 
-
--- Partition for c_state 
+-- Apply CRUD operations on vertically partitioned tables for customer to enforce contraints
 CREATE TABLE customer (
 	C_W_ID INT,
 	C_D_ID INT,
 	C_ID INT,
-	C_FIRST VARCHAR(16),
-	C_MIDDLE CHAR(2),
-	C_LAST VARCHAR(16),
+	-- C_FIRST VARCHAR(16),
+	-- C_MIDDLE CHAR(2),
+	-- C_LAST VARCHAR(16),
 	C_STREET_1 VARCHAR(20),
 	C_STREET_2 VARCHAR(20),
 	C_CITY VARCHAR(20),
-	C_STATE CHAR(2),
+	-- C_STATE CHAR(2),
 	C_ZIP CHAR(9),
 	C_PHONE CHAR(16),
 	C_SINCE TIMESTAMP,
 	C_CREDIT CHAR(2),
 	C_CREDIT_LIM DECIMAL(12, 2),
 	C_DISCOUNT DECIMAL(5, 4),
-	C_BALANCE DECIMAL(12, 2),
+	-- C_BALANCE DECIMAL(12, 2),
 	C_YTD_PAYMENT FLOAT,
 	C_PAYMENT_CNT INT,
 	C_DELIVERY_CNT INT,
@@ -114,6 +115,7 @@ CREATE TABLE item (
 );
 SELECT create_distributed_table('item', 'i_id');
 
+-- Apply CRUD operations on vertically partitioned tables for order-line to enforce contraints
 CREATE TABLE "order-line" (
     OL_W_ID INT,
     OL_D_ID INT,
@@ -127,6 +129,7 @@ CREATE TABLE "order-line" (
     OL_DIST_INFO CHAR(24),
     PRIMARY KEY (OL_W_ID, OL_D_ID, OL_O_ID, OL_NUMBER),
     FOREIGN KEY (OL_W_ID, OL_D_ID, OL_O_ID) REFERENCES "order"(O_W_ID, O_D_ID, O_ID)
+    -- FOREIGN KEY (OL_I_ID) REFERENCES Item(I_ID)
 );
 SELECT create_distributed_table('order-line', 'ol_w_id', colocate_with => 'warehouse');
 
@@ -140,10 +143,11 @@ CREATE TABLE "order-line-item-constraint" (
 );
 SELECT create_distributed_table('order-line-item-constraint', 'ol_i_id', colocate_with => 'item');
 
--- Apply CRUD operations on both tables
+-- Apply CRUD operations on vertically partitioned tables for stock to enforce contraints
 CREATE TABLE Stock (
     S_W_ID INT,
     S_I_ID INT,
+    S_QUANTITY DECIMAL(4, 0),
     S_YTD DECIMAL(8, 2),
     S_ORDER_CNT INT,
     S_REMOTE_CNT INT,
@@ -160,9 +164,11 @@ CREATE TABLE Stock (
     S_DATA VARCHAR(50),
     PRIMARY KEY (S_W_ID, S_I_ID),
     FOREIGN KEY (S_W_ID) REFERENCES Warehouse(W_ID)
+    -- FOREIGN KEY (S_I_ID) REFERENCES Item(I_ID)
 );
 SELECT create_distributed_table('stock', 's_w_id', colocate_with => 'warehouse');
 
+-- For 2.5
 CREATE TABLE "stock_2-5" (
     S_W_ID INT,
     S_I_ID INT,

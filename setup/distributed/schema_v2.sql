@@ -1,4 +1,4 @@
--- Split table and enforce contrainsts in separate tables
+-- Enforce contraints in separate tables to allow distributed database schema
 
 CREATE TABLE warehouse (
 	W_ID INT PRIMARY KEY,
@@ -81,6 +81,7 @@ CREATE TABLE item (
 );
 SELECT create_distributed_table('item', 'i_id');
 
+-- Apply CRUD operations on vertically partitioned tables for order-line to enforce contraints
 CREATE TABLE "order-line" (
     OL_W_ID INT,
     OL_D_ID INT,
@@ -94,10 +95,11 @@ CREATE TABLE "order-line" (
     OL_DIST_INFO CHAR(24),
     PRIMARY KEY (OL_W_ID, OL_D_ID, OL_O_ID, OL_NUMBER),
     FOREIGN KEY (OL_W_ID, OL_D_ID, OL_O_ID) REFERENCES "order"(O_W_ID, O_D_ID, O_ID)
+    -- FOREIGN KEY (OL_I_ID) REFERENCES Item(I_ID)
 );
 SELECT create_distributed_table('order-line', 'ol_w_id', colocate_with => 'warehouse');
 
-CREATE TABLE "order-line-item" (
+CREATE TABLE "order-line-item-constraint" (
     OL_W_ID INT,
     OL_D_ID INT,
     OL_O_ID INT,
@@ -105,8 +107,9 @@ CREATE TABLE "order-line-item" (
     OL_I_ID INT,
     FOREIGN KEY (OL_I_ID) REFERENCES Item(I_ID)
 );
-SELECT create_distributed_table('order-line-item', 'ol_i_id', colocate_with => 'item');
+SELECT create_distributed_table('order-line-item-constraint', 'ol_i_id', colocate_with => 'item');
 
+-- Apply CRUD operations on vertically partitioned tables for stock to enforce contraints
 CREATE TABLE Stock (
     S_W_ID INT,
     S_I_ID INT,
@@ -127,12 +130,14 @@ CREATE TABLE Stock (
     S_DATA VARCHAR(50),
     PRIMARY KEY (S_W_ID, S_I_ID),
     FOREIGN KEY (S_W_ID) REFERENCES Warehouse(W_ID)
+    -- FOREIGN KEY (S_I_ID) REFERENCES Item(I_ID)
 );
 SELECT create_distributed_table('stock', 's_w_id', colocate_with => 'warehouse');
 
-CREATE TABLE "stock-item" (
+CREATE TABLE "stock-item-constraint" (
     S_W_ID INT,
     S_I_ID INT,
+    PRIMARY KEY (S_W_ID, S_I_ID),
     FOREIGN KEY (S_I_ID) REFERENCES Item(I_ID)
 );
-SELECT create_distributed_table('stock-item', 's_i_id', colocate_with => 'item');
+SELECT create_distributed_table('stock-item-constraint', 's_i_id', colocate_with => 'item');
