@@ -116,6 +116,10 @@ CREATE TABLE item (
 SELECT create_distributed_table('item', 'i_id');
 
 -- Apply CRUD operations on vertically partitioned tables for order-line to enforce contraints
+'''
+Removed FK to item as FK enforcement can only happen when both Order-Line and Item are distributed on the same column
+and use the same partitioning strategy (collocated on the same partition).
+'''
 CREATE TABLE "order-line" (
     OL_W_ID INT,
     OL_D_ID INT,
@@ -133,6 +137,7 @@ CREATE TABLE "order-line" (
 );
 SELECT create_distributed_table('order-line', 'ol_w_id', colocate_with => 'warehouse');
 
+-- New table created which is collocated with the item table to enforce the FK constraint
 CREATE TABLE "order-line-item-constraint" (
     OL_W_ID INT,
     OL_D_ID INT,
