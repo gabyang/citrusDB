@@ -82,14 +82,14 @@ CREATE TABLE "customer_2-7" (
 SELECT create_distributed_table('customer_2-7', 'c_id');
 
 -- For 2.8
-CREATE TABLE "customer2-8" (
+CREATE TABLE "customer_2-8" (
 	C_W_ID INT,
 	C_D_ID INT,
 	C_ID INT,
 	C_STATE CHAR(2),
 	PRIMARY KEY (C_W_ID, C_D_ID, C_ID)
 );
-SELECT create_distributed_table('customer2-8', 'c_id');
+SELECT create_distributed_table('customer_2-8', 'c_id');
 
 CREATE TABLE "order" (
     O_W_ID INT,
@@ -116,10 +116,9 @@ CREATE TABLE item (
 SELECT create_distributed_table('item', 'i_id');
 
 -- Apply CRUD operations on vertically partitioned tables for order-line to enforce contraints
-'''
-Removed FK to item as FK enforcement can only happen when both Order-Line and Item are distributed on the same column
-and use the same partitioning strategy (collocated on the same partition).
-'''
+
+--- Removed FK to item as FK enforcement can only happen when both Order-Line and Item are distributed on the same column
+--- and use the same partitioning strategy (collocated on the same partition).
 CREATE TABLE "order-line" (
     OL_W_ID INT,
     OL_D_ID INT,
