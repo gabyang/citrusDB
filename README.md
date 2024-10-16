@@ -33,10 +33,10 @@ Register Master and Workers:
 ```
 -- Once Connected to the master node's PostgreSQL instance
 SELECT citus_set_coordinator_host('master', 5432);
-SELECT master_add_node('worker-1', 5432);
-SELECT master_add_node('worker-2', 5432);
-SELECT master_add_node('worker-3', 5432);
-SELECT master_add_node('worker-4', 5432);
+SELECT master_add_node('<COMPOSE_PROJECT_NAME>-worker-1', 5432);
+SELECT master_add_node('<COMPOSE_PROJECT_NAME>-worker-2', 5432);
+SELECT master_add_node('<COMPOSE_PROJECT_NAME>-worker-3', 5432);
+SELECT master_add_node('<COMPOSE_PROJECT_NAME>-worker-4', 5432);
 ```
 Note: The hostnames worker_1, worker_2, etc., are automatically assigned by Docker when scaling services. Ensure these match your actual container hostnames.
 
