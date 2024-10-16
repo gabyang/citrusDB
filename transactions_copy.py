@@ -690,7 +690,7 @@ class Transactions:
             self.cursor.execute("BEGIN")
 
             # Step 1: Get the state of the given customer
-            self.cursor.execute("SELECT c_state_id FROM customer WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s", 
+            self.cursor.execute("SELECT c_state FROM customer WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s", 
                                 (c_w_id, c_d_id, c_id))
             customer_state_id = self.cursor.fetchone()[0]
 
@@ -706,7 +706,7 @@ class Transactions:
             # Step 3: Get the item IDs from the last order of the given customer
             self.cursor.execute("""
                 SELECT ol_i_id 
-                FROM order_lines 
+                FROM "order_line"
                 WHERE ol_w_id = %s AND ol_d_id = %s AND ol_o_id = %s
                 """, (c_w_id, c_d_id, customer_last_order_id))
             customer_item_ids = [row[0] for row in self.cursor.fetchall()]
@@ -715,12 +715,12 @@ class Transactions:
             self.cursor.execute("""
                 SELECT DISTINCT c2.c_w_id, c2.c_d_id, c2.c_id 
                 FROM customer c1
-                JOIN customer c2 ON c1.c_state_id = c2.c_state_id
+                JOIN customer c2 ON c1.c_state = c2.c_state
                 JOIN "order" o1 ON o1.o_w_id = c1.c_w_id AND o1.o_d_id = c1.c_d_id AND o1.o_c_id = c1.c_id
                 JOIN "order" o2 ON o2.o_w_id = c2.c_w_id AND o2.o_d_id = c2.c_d_id AND o2.o_c_id = c2.c_id
-                JOIN order_lines ol1 ON ol1.ol_w_id = o1.o_w_id AND ol1.ol_d_id = o1.o_d_id AND ol1.ol_o_id = o1.o_id
-                JOIN order_lines ol2 ON ol2.ol_w_id = o2.o_w_id AND ol2.ol_d_id = o2.ol_d_id AND ol2.ol_o_id = o2.o_id
-                WHERE c1.c_state_id = %s AND c1.c_w_id = %s AND c1.c_d_id = %s AND c1.c_id = %s
+                JOIN "order-line" ol1 ON ol1.ol_w_id = o1.o_w_id AND ol1.ol_d_id = o1.o_d_id AND ol1.ol_o_id = o1.o_id
+                JOIN "order-line" ol2 ON ol2.ol_w_id = o2.o_w_id AND ol2.ol_d_id = o2.ol_d_id AND ol2.ol_o_id = o2.o_id
+                WHERE c1.c_state = %s AND c1.c_w_id = %s AND c1.c_d_id = %s AND c1.c_id = %s
                 AND ol1.ol_i_id = ol2.ol_i_id
                 GROUP BY c2.c_w_id, c2.c_d_id, c2.c_id
                 HAVING COUNT(ol1.ol_i_id) >= 2
