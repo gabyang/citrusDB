@@ -20,5 +20,6 @@ psql -U "${USER_NAME}" -d "${DB_NAME}" -c "\copy \"customer_2-8\" from '${DATA_F
 psql -U "${USER_NAME}" -d "${DB_NAME}" -c "\copy \"order\" from '${DATA_FOLDER}/order.csv' with csv header null 'null'"
 psql -U "${USER_NAME}" -d "${DB_NAME}" -c "\copy item from '${DATA_FOLDER}/item.csv' with csv header null 'null'"
 psql -U "${USER_NAME}" -d "${DB_NAME}" -c "\copy stock from '${DATA_FOLDER}/stock.csv' with csv header null 'null'"
+psql -U "${USER_NAME}" -d "${DB_NAME}" -c "\copy \"stock_2-5\" from '${DATA_FOLDER}/stock_2-5.csv' with csv header null 'null'"
 psql -U "${USER_NAME}" -d "${DB_NAME}" -c "\copy \"order-line\" from '${DATA_FOLDER}/order-line.csv' with csv header null 'null'"
 psql -U "${USER_NAME}" -d "${DB_NAME}" -c "\copy \"order-line-item-constraint\" from '${DATA_FOLDER}/order_line_item_constraint.csv' with csv header null 'null'"

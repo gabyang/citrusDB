@@ -477,7 +477,7 @@ class Transactions:
                 return 0
 
             # Step 3: Check stock levels for the items and count how many are below the threshold
-            query = "SELECT COUNT(*) FROM stock WHERE s_w_id = %s AND s_i_id = ANY(%s) AND s_quantity < %s"
+            query = 'SELECT COUNT(*) FROM "stock_2-5" WHERE s_w_id = %s AND s_i_id = ANY(%s) AND s_quantity < %s'
             self.cursor.execute(query, (w_id, item_ids, threshold))
             low_stock_count = self.cursor.fetchone()[0]
 
