@@ -66,6 +66,7 @@ CREATE TABLE customer (
 	PRIMARY KEY (C_W_ID, C_D_ID, C_ID),
 	FOREIGN KEY (C_W_ID, C_D_ID) REFERENCES District(D_W_ID, D_ID)
 );
+-- SELECT create_distributed_table('customer', 'c_id');
 SELECT create_distributed_table('customer', 'c_w_id', colocate_with => 'warehouse');
 
 -- For 2.7
