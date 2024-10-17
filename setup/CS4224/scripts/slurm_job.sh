@@ -10,9 +10,8 @@
 rm -rf $PGDATA
 
 coordinator_node=$(scontrol show hostnames | head -n 1)
-echo $coordinator_node
 srun -l bash slurm_task.sh $coordinator_node
-sleep 10
+sleep 20
 
 echo "Stop postgres"
 ${INSTALLDIR}/bin/pg_ctl -D $PGDATA stop
