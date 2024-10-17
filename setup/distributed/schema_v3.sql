@@ -45,20 +45,20 @@ CREATE TABLE customer (
 	C_W_ID INT,
 	C_D_ID INT,
 	C_ID INT,
-	-- C_FIRST VARCHAR(16),
-	-- C_MIDDLE CHAR(2),
-	-- C_LAST VARCHAR(16),
+	C_FIRST VARCHAR(16),
+	C_MIDDLE CHAR(2),
+	C_LAST VARCHAR(16),
 	C_STREET_1 VARCHAR(20),
 	C_STREET_2 VARCHAR(20),
 	C_CITY VARCHAR(20),
-	-- C_STATE CHAR(2),
+	C_STATE CHAR(2),
 	C_ZIP CHAR(9),
 	C_PHONE CHAR(16),
 	C_SINCE TIMESTAMP,
 	C_CREDIT CHAR(2),
 	C_CREDIT_LIM DECIMAL(12, 2),
 	C_DISCOUNT DECIMAL(5, 4),
-	-- C_BALANCE DECIMAL(12, 2),
+	C_BALANCE DECIMAL(12, 2),
 	C_YTD_PAYMENT FLOAT,
 	C_PAYMENT_CNT INT,
 	C_DELIVERY_CNT INT,
@@ -66,6 +66,7 @@ CREATE TABLE customer (
 	PRIMARY KEY (C_W_ID, C_D_ID, C_ID),
 	FOREIGN KEY (C_W_ID, C_D_ID) REFERENCES District(D_W_ID, D_ID)
 );
+-- SELECT create_distributed_table('customer', 'c_id');
 SELECT create_distributed_table('customer', 'c_w_id', colocate_with => 'warehouse');
 
 -- For 2.7
