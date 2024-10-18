@@ -1,8 +1,6 @@
 import os
 import psycopg2
 from datetime import datetime, timezone
-import sys
-from psycopg2 import sql
 
 from dotenv import load_dotenv
 
@@ -40,6 +38,7 @@ class Transactions:
             # print("First row:", rows[0])
             # print("Successfully connected to the PostgreSQL database")
             # print(self.cursor )
+            
 
         except (Exception, psycopg2.DatabaseError) as error:
             print(f"Error while connecting to PostgreSQL: {error}")
@@ -211,76 +210,87 @@ class Transactions:
             - Payment amount
         """
         try:
+            self.cursor.execute("BEGIN")
+
             # Step 1: Update the warehouse by incrementing W_YTD by PAYMENT
-            self.cursor.execute(
-                sql.SQL("UPDATE warehouse SET W_YTD = W_YTD + %s WHERE W_ID = %s;"),
-                (payment, c_w_id)
-            )
+            self.cursor.execute("""
+                UPDATE warehouse 
+                SET w_ytd = w_ytd + %s 
+                WHERE w_id = %s
+            """, (payment, c_w_id))
 
             # Step 2: Update the district by incrementing D_YTD by PAYMENT
-            self.cursor.execute(
-                sql.SQL("UPDATE district SET D_YTD = D_YTD + %s WHERE D_W_ID = %s AND D_ID = %s;"),
-                (payment, c_w_id, c_d_id)
-            )
+            self.cursor.execute("""
+                UPDATE district 
+                SET d_ytd = d_ytd + %s 
+                WHERE d_w_id = %s AND d_id = %s
+            """, (payment, c_w_id, c_d_id))
 
-            # Step 3: Decrement C_BALANCE by PAYMENT
-            self.cursor.execute(
-                sql.SQL("UPDATE \"customer_2-7\" SET C_BALANCE = C_BALANCE - %s WHERE C_W_ID = %s AND C_D_ID = %s AND C_ID = %s;"),
-                (payment, c_w_id, c_d_id, c_id)
-            )
+            # Step 3: Update the customer as follows:
+            # Decrement C_BALANCE, Increment C_YTD_PAYMENT, Increment C_PAYMENT_CNT
+            self.cursor.execute("""
+                UPDATE customer 
+                SET c_balance = c_balance - %s, 
+                    c_ytd_payment = c_ytd_payment + %s, 
+                    c_payment_cnt = c_payment_cnt + 1
+                WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s
+            """, (payment, payment, c_w_id, c_d_id, c_id))
 
-            # Step 4: Increment C_YTD_PAYMENT by PAYMENT
-            self.cursor.execute(
-                sql.SQL("UPDATE customer SET C_YTD_PAYMENT = C_YTD_PAYMENT + %s WHERE C_W_ID = %s AND C_D_ID = %s AND C_ID = %s;"),
-                (payment, c_w_id, c_d_id, c_id)
-            )
+            # Retrieve the updated customer information
+            self.cursor.execute("""
+                SELECT c_w_id, c_d_id, c_id, c_first, c_middle, c_last, 
+                    c_street_1, c_street_2, c_city, c_state, c_zip, 
+                    c_phone, c_since, c_credit, c_credit_lim, 
+                    c_discount, c_balance
+                FROM customer
+                WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s
+            """, (c_w_id, c_d_id, c_id))
+            customer_info = self.cursor.fetchone()
 
-            # Step 5: Increment Increment C_PAYMENT_CNT by 1
-            self.cursor.execute(
-                sql.SQL("UPDATE customer SET C_PAYMENT_CNT = C_PAYMENT_CNT + 1 WHERE C_W_ID = %s AND C_D_ID = %s AND C_ID = %s;"),
-                (c_w_id, c_d_id, c_id)
-            )
+            # Retrieve the warehouse address
+            self.cursor.execute("""
+                SELECT w_street_1, w_street_2, w_city, w_state, w_zip
+                FROM warehouse
+                WHERE w_id = %s
+            """, (c_w_id,))
+            warehouse_info = self.cursor.fetchone()
 
-            # Step 6: Fetch customer
-            self.cursor.execute(
-                sql.SQL("SELECT C_W_ID,C_D_ID,C_ID FROM customer WHERE C_W_ID = %s AND C_D_ID = %s AND C_ID = %s;"),
-                (c_w_id, c_d_id, c_id)
-            )
-            customer_identifier = self.cursor.fetchone()
+            # Retrieve the district address
+            self.cursor.execute("""
+                SELECT d_street_1, d_street_2, d_city, d_state, d_zip
+                FROM district
+                WHERE d_w_id = %s AND d_id = %s
+            """, (c_w_id, c_d_id))
+            district_info = self.cursor.fetchone()
 
-            # Step 4: Fetch customer
-            self.cursor.execute(
-                sql.SQL("SELECT C_FIRST, C_MIDDLE, C_LAST FROM \"customer_2-7\" WHERE C_W_ID = %s AND C_D_ID = %s AND C_ID = %s;"),
-                (c_w_id, c_d_id, c_id)
-            )
-            customer_name = self.cursor.fetchone()
-
-            # Step 4: Fetch customer address
-            self.cursor.execute(
-                sql.SQL("SELECT C_STREET_1, C_STREET_2, C_CITY, C_ZIP FROM customer WHERE C_W_ID = %s AND C_D_ID = %s AND C_ID = %s;"),
-                (c_w_id, c_d_id, c_id)
-            )
-            customer_addr = self.cursor.fetchone()
-
-            # Step 5: Commit the transaction using self.cursor.execute("COMMIT")
             self.cursor.execute("COMMIT")
 
+            # Output the payment transaction details
+            print("Customer Information:")
+            print(f"ID: ({customer_info[0]}, {customer_info[1]}, {customer_info[2]})")
+            print(f"Name: {customer_info[3]} {customer_info[4]} {customer_info[5]}")
+            print(f"Address: {customer_info[6]}, {customer_info[7]}, {customer_info[8]}, {customer_info[9]}, {customer_info[10]}")
+            print(f"Phone: {customer_info[11]}")
+            print(f"Since: {customer_info[12]}")
+            print(f"Credit: {customer_info[13]}")
+            print(f"Credit Limit: {customer_info[14]}")
+            print(f"Discount: {customer_info[15]}")
+            print(f"Balance: {customer_info[16]}")
+
+            print("Warehouse Address:")
+            print(f"{warehouse_info[0]}, {warehouse_info[1]}, {warehouse_info[2]}, {warehouse_info[3]}, {warehouse_info[4]}")
+
+            print("District Address:")
+            print(f"{district_info[0]}, {district_info[1]}, {district_info[2]}, {district_info[3]}, {district_info[4]}")
+
+            print(f"Payment Amount: {payment}")
+
             return {
-                "customer_name": customer_name,
-                "customer_addr": customer_addr,
+                "customer_info": customer_info,
+                "warehouse_info": warehouse_info,
+                "district_info": district_info,
+                "payment_amount": payment
             }
-            # print("C_PHONE: {}".format(customer_info[8]))
-            # print("C_SINCE: {}".format(customer_info[9]))
-            # print("C_CREDIT: {}".format(customer_info[10]))
-            # print("C_CREDIT_LIM: {}".format(customer_info[11]))
-            # print("C_DISCOUNT: {}".format(customer_info[12]))
-            # print("C_BALANCE: {}".format(customer_info[13]))
-            
-            # print("Warehouse Address: (W_STREET_1, W_STREET_2, W_CITY, W_STATE, W_ZIP): ({}, {}, {}, {}, {})".format(*warehouse_info))
-            # print("District Address: (D_STREET_1, D_STREET_2, D_CITY, D_STATE, D_ZIP): ({}, {}, {}, {}, {})".format(*district_info))
-            # print("Payment Amount: {}".format(payment))
-
-
 
         except (Exception, psycopg2.DatabaseError) as error:
             print(f"An error occurred: {error}")
@@ -467,7 +477,7 @@ class Transactions:
                 return 0
 
             # Step 3: Check stock levels for the items and count how many are below the threshold
-            query = "SELECT COUNT(*) FROM stock WHERE s_w_id = %s AND s_i_id = ANY(%s) AND s_quantity < %s"
+            query = 'SELECT COUNT(*) FROM "stock_2-5" WHERE s_w_id = %s AND s_i_id = ANY(%s) AND s_quantity < %s'
             self.cursor.execute(query, (w_id, item_ids, threshold))
             low_stock_count = self.cursor.fetchone()[0]
 
@@ -507,9 +517,10 @@ class Transactions:
             self.cursor.execute("BEGIN")
 
             # Step 1: Get the next available order number for the district
+            # Can make use of the vertically partitioned District table (district_2-5)
             self.cursor.execute("""
                 SELECT d_next_o_id 
-                FROM district 
+                FROM "district_2-5"
                 WHERE d_w_id = %s AND d_id = %s
             """, (w_id, d_id))
             next_order_id = self.cursor.fetchone()[0]
@@ -600,9 +611,9 @@ class Transactions:
                 SELECT 
                     C_FIRST, C_MIDDLE, C_LAST, C_BALANCE, 
                     C_W_ID, C_D_ID
-                FROM customer 
-                JOIN warehouse ON customer.c_w_id = warehouse.w_id 
-                JOIN district ON customer.c_d_id = district.d_id 
+                FROM "customer_2-7" AS cust
+                JOIN warehouse ON cust.c_w_id = warehouse.w_id 
+                JOIN district ON cust.c_d_id = district.d_id 
                 ORDER BY C_BALANCE DESC 
                 LIMIT 10
             """)
@@ -680,7 +691,7 @@ class Transactions:
             self.cursor.execute("BEGIN")
 
             # Step 1: Get the state of the given customer
-            self.cursor.execute("SELECT c_state FROM customer WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s", 
+            self.cursor.execute("SELECT c_state_id FROM customer WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s", 
                                 (c_w_id, c_d_id, c_id))
             customer_state_id = self.cursor.fetchone()[0]
 
@@ -696,20 +707,21 @@ class Transactions:
             # Step 3: Get the item IDs from the last order of the given customer
             self.cursor.execute("""
                 SELECT ol_i_id 
-                FROM "order_line"
-                WHERE ol_w_id = %s AND ol_d_id = %s AND ol_o_id = %s
+                FROM "order-line"
+                WHERE ol_w_id = 1 AND ol_d_id = 1 AND ol_o_id = 1
                 """, (c_w_id, c_d_id, customer_last_order_id))
             customer_item_ids = [row[0] for row in self.cursor.fetchall()]
 
             # Step 4: Find related customers in the same state who have at least two items in common in their last order
+            # c_state_id should be c_state as per the schema
             self.cursor.execute("""
                 SELECT DISTINCT c2.c_w_id, c2.c_d_id, c2.c_id 
-                FROM customer c1
-                JOIN customer c2 ON c1.c_state = c2.c_state
+                FROM "customer_2-8" c1
+                JOIN "customer_2-8" c2 ON c1.c_state = c2.c_state
                 JOIN "order" o1 ON o1.o_w_id = c1.c_w_id AND o1.o_d_id = c1.c_d_id AND o1.o_c_id = c1.c_id
                 JOIN "order" o2 ON o2.o_w_id = c2.c_w_id AND o2.o_d_id = c2.c_d_id AND o2.o_c_id = c2.c_id
                 JOIN "order-line" ol1 ON ol1.ol_w_id = o1.o_w_id AND ol1.ol_d_id = o1.o_d_id AND ol1.ol_o_id = o1.o_id
-                JOIN "order-line" ol2 ON ol2.ol_w_id = o2.o_w_id AND ol2.ol_d_id = o2.ol_d_id AND ol2.ol_o_id = o2.o_id
+                JOIN "order-line" ol2 ON ol2.ol_w_id = o2.o_w_id AND ol2.ol_d_id = o2.o_d_id AND ol2.ol_o_id = o2.o_id
                 WHERE c1.c_state = %s AND c1.c_w_id = %s AND c1.c_d_id = %s AND c1.c_id = %s
                 AND ol1.ol_i_id = ol2.ol_i_id
                 GROUP BY c2.c_w_id, c2.c_d_id, c2.c_id

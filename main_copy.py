@@ -57,6 +57,15 @@ def process_transaction(params):
         result = txn_func()
         print(f"Processed {txn_type}: {result}")
 
+    elif txn_type == 'P':
+        values = params.split(',')
+        c_w_id = int(values[1])  
+        c_d_id = int(values[2])  
+        c_id = int(values[3])   
+        payment = float(values[4])  
+        result = txn_func(c_w_id, c_d_id, c_id, payment)
+        print(f"Processed {txn_type}: {result}")
+
     else:
         cleaned_params = [item.strip() for item in params[1:]]
         variables = cast_type(cleaned_params)
@@ -69,22 +78,29 @@ def process_transaction(params):
     total_num_exec_xacts += 1
     total_exec_time += latency
 
+for line in sys.stdin:
+    # Read and parse transaction from stdin
+    process_transaction(line)
+    
+    # try:
+    #     process_transaction()
+    # except Exception as e:
+    #     print(f"Error processing transaction: {e}", file=sys.stderr)
 
+# filename = "test1.txt"
 
-filename = "test1.txt"
-
-if filename:
-  try:
-    with open(filename, 'r') as file:
-      for line in file:
-        process_transaction(line.split(','))
-  except FileNotFoundError:
-    print(f"Error: File '{filename}' not found.")
-  except Exception as e:
-    print(f"An error occurred: {str(e)}")
-else:
-  print("Please provide a filename as an argument.")
-  sys.exit(1)
+# if filename:
+#   try:
+#     with open(filename, 'r') as file:
+#       for line in file:
+#         process_transaction(line.split(','))
+#   except FileNotFoundError:
+#     print(f"Error: File '{filename}' not found.")
+#   except Exception as e:
+#     print(f"An error occurred: {str(e)}")
+# else:
+#   print("Please provide a filename as an argument.")
+#   sys.exit(1)
 
 print(f"Total Transactions Executed: {total_num_exec_xacts}")
 print(f"Total Execution Time: {total_exec_time:.2f} seconds")
