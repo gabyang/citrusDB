@@ -265,10 +265,10 @@ class Transactions:
             # Step 5: Commit the transaction using self.cursor.execute("COMMIT")
             self.cursor.execute("COMMIT")
 
-            # Output the required information
-            print("Customer Identifier: (C_W_ID, C_D_ID, C_ID): ({}, {}, {})".format(c_w_id, c_d_id, c_id))
-            print("Customer Name: (C_FIRST, C_MIDDLE, C_LAST): {}".format(customer_name))
-            print("Customer Address: (C_STREET_1, C_STREET_2, C_CITY, C_STATE, C_ZIP): ({})".format(customer_addr))
+            return {
+                "customer_name": customer_name,
+                "customer_addr": customer_addr,
+            }
             # print("C_PHONE: {}".format(customer_info[8]))
             # print("C_SINCE: {}".format(customer_info[9]))
             # print("C_CREDIT: {}".format(customer_info[10]))
