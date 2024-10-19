@@ -12,7 +12,7 @@ DATA_FOLDER="project_files/data_files"
 # psql -U "${USER_NAME}" -d "${DB_NAME}" -c "\copy \"order-line\" from '${DATA_FOLDER}/order-line.csv' with csv header null 'null'"
 
 psql -U "${USER_NAME}" -d "${DB_NAME}" -c "\copy warehouse from '${DATA_FOLDER}/warehouse.csv' with csv header null 'null'"
-psql -U "${USER_NAME}" -d "${DB_NAME}" -c "\copy district from '${DATA_FOLDER}/base_district.csv' with csv header null 'null'"
+psql -U "${USER_NAME}" -d "${DB_NAME}" -c "\copy district from '${DATA_FOLDER}/district.csv' with csv header null 'null'"
 psql -U "${USER_NAME}" -d "${DB_NAME}" -c "\copy \"district_2-5\" from '${DATA_FOLDER}/district_2-5.csv' with csv header null 'null'"
 psql -U "${USER_NAME}" -d "${DB_NAME}" -c "\copy customer from '${DATA_FOLDER}/customer.csv' with csv header null 'null'"
 psql -U "${USER_NAME}" -d "${DB_NAME}" -c "\copy \"customer_2-7\" from '${DATA_FOLDER}/customer_2-7.csv' with csv header null 'null'"
