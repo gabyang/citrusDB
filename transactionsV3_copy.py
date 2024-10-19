@@ -211,86 +211,15 @@ class Transactions:
         """
         try:
             self.cursor.execute("BEGIN")
-
-            # Step 1: Update the warehouse by incrementing W_YTD by PAYMENT
+            print(c_w_id, c_d_id, c_id, payment)
             self.cursor.execute("""
-                UPDATE warehouse 
-                SET w_ytd = w_ytd + %s 
-                WHERE w_id = %s
-            """, (payment, c_w_id))
-
-            # Step 2: Update the district by incrementing D_YTD by PAYMENT
-            self.cursor.execute("""
-                UPDATE district 
-                SET d_ytd = d_ytd + %s 
-                WHERE d_w_id = %s AND d_id = %s
-            """, (payment, c_w_id, c_d_id))
-
-            # Step 3: Update the customer as follows:
-            # Decrement C_BALANCE, Increment C_YTD_PAYMENT, Increment C_PAYMENT_CNT
-            self.cursor.execute("""
-                UPDATE customer 
-                SET c_balance = c_balance - %s, 
-                    c_ytd_payment = c_ytd_payment + %s, 
-                    c_payment_cnt = c_payment_cnt + 1
-                WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s
-            """, (payment, payment, c_w_id, c_d_id, c_id))
-
-            # Retrieve the updated customer information
-            self.cursor.execute("""
-                SELECT c_w_id, c_d_id, c_id, c_first, c_middle, c_last, 
-                    c_street_1, c_street_2, c_city, c_state, c_zip, 
-                    c_phone, c_since, c_credit, c_credit_lim, 
-                    c_discount, c_balance
-                FROM customer
-                WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s
-            """, (c_w_id, c_d_id, c_id))
-            customer_info = self.cursor.fetchone()
-
-            # Retrieve the warehouse address
-            self.cursor.execute("""
-                SELECT w_street_1, w_street_2, w_city, w_state, w_zip
-                FROM warehouse
-                WHERE w_id = %s
-            """, (c_w_id,))
-            warehouse_info = self.cursor.fetchone()
-
-            # Retrieve the district address
-            self.cursor.execute("""
-                SELECT d_street_1, d_street_2, d_city, d_state, d_zip
-                FROM district
-                WHERE d_w_id = %s AND d_id = %s
-            """, (c_w_id, c_d_id))
-            district_info = self.cursor.fetchone()
-
+                call process_payment(%s, %s, %s, %s);
+            """, (c_w_id, c_d_id, c_id, payment))
+            # Capture any notices that were raised
+            for notice in self.cursor.connection.notices:
+                print(notice.strip())
             self.cursor.execute("COMMIT")
 
-            # Output the payment transaction details
-            print("Customer Information:")
-            print(f"ID: ({customer_info[0]}, {customer_info[1]}, {customer_info[2]})")
-            print(f"Name: {customer_info[3]} {customer_info[4]} {customer_info[5]}")
-            print(f"Address: {customer_info[6]}, {customer_info[7]}, {customer_info[8]}, {customer_info[9]}, {customer_info[10]}")
-            print(f"Phone: {customer_info[11]}")
-            print(f"Since: {customer_info[12]}")
-            print(f"Credit: {customer_info[13]}")
-            print(f"Credit Limit: {customer_info[14]}")
-            print(f"Discount: {customer_info[15]}")
-            print(f"Balance: {customer_info[16]}")
-
-            print("Warehouse Address:")
-            print(f"{warehouse_info[0]}, {warehouse_info[1]}, {warehouse_info[2]}, {warehouse_info[3]}, {warehouse_info[4]}")
-
-            print("District Address:")
-            print(f"{district_info[0]}, {district_info[1]}, {district_info[2]}, {district_info[3]}, {district_info[4]}")
-
-            print(f"Payment Amount: {payment}")
-
-            return {
-                "customer_info": customer_info,
-                "warehouse_info": warehouse_info,
-                "district_info": district_info,
-                "payment_amount": payment
-            }
 
         except (Exception, psycopg2.DatabaseError) as error:
             print(f"An error occurred: {error}")

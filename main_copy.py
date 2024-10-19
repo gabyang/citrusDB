@@ -1,7 +1,7 @@
 import sys
 import time
 
-from transactions_copy import Transactions
+from transactionsV3_copy import Transactions
 
 txn = Transactions()
 
@@ -59,6 +59,7 @@ def process_transaction(params):
 
     elif txn_type == 'P':
         values = params.split(',')
+        print(values)
         c_w_id = int(values[1])  
         c_d_id = int(values[2])  
         c_id = int(values[3])   
