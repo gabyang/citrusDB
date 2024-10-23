@@ -6,15 +6,11 @@
 #SBATCH --time=120
 
 
-
 rm -rf $PGDATA
+rm -rf ${ADD_TABLE_SIGNAL_FILE}
 
 coordinator_node=$(scontrol show hostnames | head -n 1)
-srun -l bash slurm_task.sh $coordinator_node
-sleep 20
-
-echo "Stop postgres"
-${INSTALLDIR}/bin/pg_ctl -D $PGDATA stop
+srun -l bash setup.sh $coordinator_node
 wait
 
 

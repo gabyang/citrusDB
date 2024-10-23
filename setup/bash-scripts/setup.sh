@@ -14,10 +14,29 @@ DATA_FOLDER=$HOME/tyx021/data_files
 NODELIST=$(scontrol show hostname $SLURM_NODELIST) # Gets a list of hostnames
 NODE_ARRAY=($NODELIST) # Convert the list into an array
 
+SIGNAL_DIR="../$SLURM_JOB_ID"
+ADD_TABLE_SIGNAL_FILE=${SIGNAL_DIR}/add_table_signal
+
+signal_worker_done() {
+    touch ${ADD_TABLE_SIGNAL_FILE}
+}
+
+wait_worker_done() {
+    while [ ! -f ${ADD_TABLE_SIGNAL_FILE} ]; do
+        sleep 5
+    done
+}
+
 # create log directory
 if [ ! -d "${LOGDIR}" ]; then
 	mkdir -p ${LOGDIR}
 fi
+
+if [ ! -d "${SIGNAL_DIR}" ]; then
+    mkdir -p ${SIGNAL_DIR}
+fi
+
+
 
 if [ ${REMAINDER} -eq 0 ]; then
     rm -rf /tmp/.s.PGSQL.5098.lock
@@ -39,10 +58,11 @@ if [ ${REMAINDER} -eq 0 ]; then
         ${INSTALLDIR}/bin/psql -U $PGUSER -d $PGDATABASE -c "SELECT * from citus_get_active_worker_nodes();"
 
         bash $HOME/tyx021/init-data.sh
+        signal_worker_done
     else
         echo "Process $SLURM_PROCID on ${HOSTNAME} will be executing as a Citus worker node"
+        wait_worker_done
     fi
 else
 	echo "Process $SLURM_PROCID on ${HOSTNAME} will be executing as a client issuing transactions" 
 fi
-wait
