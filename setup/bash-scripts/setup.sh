@@ -15,14 +15,25 @@ NODELIST=$(scontrol show hostname $SLURM_NODELIST) # Gets a list of hostnames
 NODE_ARRAY=($NODELIST) # Convert the list into an array
 
 SIGNAL_DIR="../$SLURM_JOB_ID"
-ADD_TABLE_SIGNAL_FILE=${SIGNAL_DIR}/add_table_signal
+BARRIER_DIR="${SIGNAL_DIR}/barrier"
+TABLE_SETUP_DONE_SIGNAL_FILE="${SIGNAL_DIR}/table_setup_done"
 
-signal_worker_done() {
-    touch ${ADD_TABLE_SIGNAL_FILE}
+signal_table_setup_done() {
+    touch ${TABLE_SETUP_DONE_SIGNAL_FILE}
 }
 
-wait_worker_done() {
-    while [ ! -f ${ADD_TABLE_SIGNAL_FILE} ]; do
+wait_table_setup() {
+    while [ ! -f ${TABLE_SETUP_DONE_SIGNAL_FILE} ]; do
+        sleep 5
+    done
+}
+
+signal_barrier() {
+    touch ${SIGNAL_DIR}/node_${SLURM_PROCID}_ready
+}
+
+wait_barrier() {
+    while [ $(ls ${BARRIER_DIR} | wc -l) -lt ${SLURM_NNODES} ]; do
         sleep 5
     done
 }
@@ -36,6 +47,9 @@ if [ ! -d "${SIGNAL_DIR}" ]; then
     mkdir -p ${SIGNAL_DIR}
 fi
 
+if [ ! -d "${BARRIER_DIR}" ]; then
+    mkdir -p ${BARRIER_DIR}
+fi
 
 
 if [ ${REMAINDER} -eq 0 ]; then
@@ -58,11 +72,38 @@ if [ ${REMAINDER} -eq 0 ]; then
         ${INSTALLDIR}/bin/psql -U $PGUSER -d $PGDATABASE -c "SELECT * from citus_get_active_worker_nodes();"
 
         bash $HOME/tyx021/init-data.sh
-        signal_worker_done
+        signal_table_setup_done
     else
         echo "Process $SLURM_PROCID on ${HOSTNAME} will be executing as a Citus worker node"
-        wait_worker_done
+        wait_table_setup
     fi
 else
 	echo "Process $SLURM_PROCID on ${HOSTNAME} will be executing as a client issuing transactions" 
+    wait_table_setup
+
+    # Initialize a task counter to map processes to text files
+    task_counter=0
+
+    # Calculate the task file based on the process ID
+    for ((i=0; i<${SLURM_PROCID}; i++)); do
+        if [ $((i % 5)) -ne 0 ]; then
+            task_counter=$((task_counter + 1))
+        fi
+    done
+
+    # Assign task file based on task_counter
+    task_file="${task_counter}.TXT"
+    echo "Process $SLURM_PROCID is working on task ${task_file}"
+
+    # Execute a job related to the task file
+    # python3 test-run/main.py ${coordinator_node} --input "${task_file}"
+fi
+
+# To prevent the script from exiting before all processes are done
+signal_barrier
+wait_barrier
+
+# coordinator node will remove signal files
+if [ ${REMAINDER} -eq 0 ] && [ "${HOSTNAME}" = "$coordinator_node" ]; then
+    rm -rf ${SIGNAL_DIR}
 fi
