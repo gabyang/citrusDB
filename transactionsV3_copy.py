@@ -2,7 +2,7 @@ import os
 import psycopg2
 from datetime import datetime, timezone
 
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 
 class Transactions:
     cursor = None
@@ -10,11 +10,17 @@ class Transactions:
 
     def __init__(self):
         load_dotenv()
-        host = os.getenv("DATABASE_HOST")
-        database = os.getenv("DATABASE_NAME")
-        username = os.getenv("DATABASE_USERNAME")
-        port = int(os.getenv("DATABASE_PORT", "5432"))
-        password = os.getenv("DATABASE_PASSWORD")
+        # host = os.getenv("DATABASE_HOST")
+        # database = os.getenv("DATABASE_NAME")
+        # username = os.getenv("DATABASE_USERNAME")
+        # port = int(os.getenv("DATABASE_PORT", "5432"))
+        # password = os.getenv("DATABASE_PASSWORD")
+
+        host="localhost"
+        database = "postgres"
+        username = "postgres"
+        port = 5432
+        password = None
 
         try:
             self.conn = psycopg2.connect(
@@ -289,7 +295,7 @@ class Transactions:
                 
                 # Step 1d: Update the customer balance and increment the delivery count
                 self.cursor.execute("""
-                    UPDATE customer_param 
+                    UPDATE customer
                     SET c_balance = c_balance + %s, c_delivery_cnt = c_delivery_cnt + 1 
                     WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s
                     """, (total_amount, w_id, district_no, customer_id))
@@ -352,7 +358,7 @@ class Transactions:
             # Step 3: Get the items in the customer's last order
             self.cursor.execute("""
                 SELECT ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_delivery_d
-                FROM order_lines
+                FROM "order-line"
                 WHERE ol_w_id = %s AND ol_d_id = %s AND ol_o_id = %s
             """, (c_w_id, c_d_id, last_order[0]))
             order_items = self.cursor.fetchall()
@@ -471,7 +477,7 @@ class Transactions:
             # Step 3: Get the set of all items contained in the last L orders
             self.cursor.execute("""
                 SELECT ol_i_id, SUM(ol_quantity) as total_qty, COUNT(DISTINCT ol_o_id) as num_orders
-                FROM order_lines
+                FROM "order-line"
                 WHERE ol_w_id = %s AND ol_d_id = %s AND ol_o_id = ANY(%s)
                 GROUP BY ol_i_id
             """, (w_id, d_id, last_order_ids))
@@ -620,7 +626,7 @@ class Transactions:
             self.cursor.execute("BEGIN")
 
             # Step 1: Get the state of the given customer
-            self.cursor.execute("SELECT c_state_id FROM customer WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s", 
+            self.cursor.execute("SELECT c_state FROM customer WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s", 
                                 (c_w_id, c_d_id, c_id))
             customer_state_id = self.cursor.fetchone()[0]
 
