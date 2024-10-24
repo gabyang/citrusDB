@@ -4,9 +4,10 @@ import time
 from transactionsV3_copy import Transactions
 
 # get command line arguments
-COORDINATOR_IP = sys.argv[1]
+client_number = sys.argv[1]
+transaction_file = sys.argv[2]  # edit hardcoded filename after done
 
-txn = Transactions("project", "cs4224b", COORDINATOR_IP, 5098)
+txn = Transactions("project", "cs4224b", 5098)
 
 txn_funcs_dict = {
     "N": (txn.new_order_txn, txn.cast_new_order_type),
