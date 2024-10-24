@@ -14,6 +14,12 @@ class Transactions:
         port = int(os.getenv("DATABASE_PORT", "5432"))
         password = os.getenv("DATABASE_PASSWORD")
 
+        # host="localhost"
+        # database = "postgres"
+        # username = "postgres"
+        # port = 5432
+        # password = None
+
         try:
             self.conn = psycopg2.connect(
                 host=host,

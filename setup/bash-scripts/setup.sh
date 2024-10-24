@@ -96,7 +96,7 @@ else
     echo "Process $SLURM_PROCID is working on task ${task_file}"
 
     # Execute a job related to the task file
-    # python3 test-run/main.py ${coordinator_node} --input "${task_file}"
+    python3 test-run/main.py ${task_counter} "${task_file}"
 fi
 
 # To prevent the script from exiting before all processes are done

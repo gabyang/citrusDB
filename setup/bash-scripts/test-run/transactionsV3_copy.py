@@ -10,16 +10,14 @@ class Transactions:
     cursor = None
     conn = None
 
-    def __init__(self, database, username, host, port):
+    def __init__(self, database, username, port):
         # load_dotenv()
         host = "localhost"
-        # database = "project"
-        # username = "cs4224b"
-        # port = 5098
-        # password = None
 
         try:
-            self.conn = psycopg2.connect(host=host, database=database, user=username, port=port)
+            self.conn = psycopg2.connect(
+                host="localhost", database=database, user=username, port=port
+            )
             # self.conn.autocommit = True
 
             self.cursor = self.conn.cursor()
