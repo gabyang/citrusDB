@@ -25,7 +25,7 @@ BEGIN
     -- Fetch customer information: Name and balance
     SELECT c_first, c_middle, c_last, c_balance
     INTO v_c_first, v_c_middle, v_c_last, v_c_balance
-    FROM "customer_2-7"
+    FROM customer
     WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id;
 
     -- Output customer information
