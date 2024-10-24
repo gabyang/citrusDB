@@ -1,6 +1,6 @@
 import csv
 import time
-results_dir = "." # Insert later
+results_dir = "./metrics" # Insert later
 
 def query_statistics(cursor):
     measurements = [

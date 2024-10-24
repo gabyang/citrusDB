@@ -3,7 +3,7 @@ import statistics
 import sys
 import time
 
-results_dir = "." # Insert later
+results_dir = "./metrics" # Insert later
 
 def performance_metrics(total_xacts, total_xact_time, latencies):
     total_xact_time = round(total_xact_time, 2)
