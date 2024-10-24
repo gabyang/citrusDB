@@ -2,6 +2,10 @@ import sys
 import time
 
 from transactions_copy import Transactions
+from query_statistics import query_statistics
+from metrics import performance_metrics, write_metrics_csv
+
+client_number = 1 # Get client number from command line
 
 txn = Transactions()
 
@@ -71,7 +75,7 @@ def process_transaction(params):
 
 
 
-filename = "test1.txt"
+filename = "test.txt"
 
 if filename:
   try:
@@ -85,6 +89,16 @@ if filename:
 else:
   print("Please provide a filename as an argument.")
   sys.exit(1)
+
+print("Measuring database statistics")
+query_statistics(txn.cursor)
+
+print("Measuring performance metrics")
+metrics = performance_metrics(total_num_exec_xacts, total_exec_time, latencies)
+
+print(f"Client {client_number}: writing performance metrics")
+write_metrics_csv(client_number, metrics)
+
 
 print(f"Total Transactions Executed: {total_num_exec_xacts}")
 print(f"Total Execution Time: {total_exec_time:.2f} seconds")
