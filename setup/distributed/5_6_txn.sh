@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # SQL command to drop the procedure if it exists
-DROP_PROCEDURE_SQL="DROP PROCEDURE IF EXISTS process_payment(INT, INT, INT, NUMERIC);"
+DROP_PROCEDURE_SQL="DROP PROCEDURE IF EXISTS find_most_popular_items(INT, INT, INT);"
 
 # SQL command to create the procedure
 CREATE_PROCEDURE_SQL=$(cat <<EOF

@@ -3,3 +3,4 @@
 __pycache__
 citrus-venv
 /setup/*/project_files/*
+venv/
