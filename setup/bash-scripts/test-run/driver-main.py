@@ -73,21 +73,6 @@ def process_transaction(params):
     total_num_exec_xacts += 1
     total_exec_time += latency
 
-
-# filename = "test.txt"
-
-# if filename:
-#   try:
-#     with open(filename, 'r') as file:
-#       for line in file:
-#         process_transaction(line.split(','))
-#   except FileNotFoundError:
-#     print(f"Error: File '{filename}' not found.")
-#   except Exception as e:
-#     print(f"An error occurred: {str(e)}")
-# else:
-#   print("Please provide a filename as an argument.")
-#   sys.exit(1)
 for line in sys.stdin:
     # Read and parse transaction from stdin
     process_transaction(line.split(","))

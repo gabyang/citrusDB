@@ -11,18 +11,12 @@ class Transactions:
     conn = None
 
     def __init__(self):
-        # load_dotenv()
-        # host = os.getenv("DATABASE_HOST")
-        # database = os.getenv("DATABASE_NAME")
-        # username = os.getenv("DATABASE_USERNAME")
-        # port = int(os.getenv("DATABASE_PORT", "5432"))
-        # password = os.getenv("DATABASE_PASSWORD")
-
-        host="localhost"
-        database = "postgres"
-        username = "postgres"
-        port = 5432
-        password = None
+        load_dotenv()
+        host = os.getenv("DATABASE_HOST")
+        database = os.getenv("DATABASE_NAME")
+        username = os.getenv("DATABASE_USERNAME")
+        port = int(os.getenv("DATABASE_PORT", "5432"))
+        password = os.getenv("DATABASE_PASSWORD")
         
         try:
             self.conn = psycopg2.connect(
