@@ -12,6 +12,7 @@ CREATE TABLE warehouse (
 	W_YTD DECIMAL(12, 2)
 );
 SELECT create_distributed_table('warehouse', 'w_id');
+CREATE INDEX "warehouse_idx" ON "warehouse" (W_ID);
 
 -- Apply CRUD operations on vertically partitioned tables for district to enforce contraints
 CREATE TABLE district (
@@ -30,6 +31,7 @@ CREATE TABLE district (
 	FOREIGN KEY (D_W_ID) REFERENCES Warehouse(W_ID)
 );
 SELECT create_distributed_table('district', 'd_w_id', colocate_with => 'warehouse');
+CREATE INDEX "district_idx" ON "district" (D_W_ID, D_ID);
 
 -- For 2.5
 CREATE TABLE "district_2-5" (
@@ -39,6 +41,7 @@ CREATE TABLE "district_2-5" (
 	PRIMARY KEY (D_W_ID, D_ID)
 );
 SELECT create_distributed_table('district_2-5', 'd_id');
+CREATE INDEX "district_2-5_idx" ON "district_2-5" (D_W_ID, D_ID);
 
 -- Apply CRUD operations on vertically partitioned tables for customer to enforce contraints
 CREATE TABLE customer (
@@ -68,6 +71,7 @@ CREATE TABLE customer (
 );
 -- SELECT create_distributed_table('customer', 'c_id');
 SELECT create_distributed_table('customer', 'c_w_id', colocate_with => 'warehouse');
+CREATE INDEX "customer_idx" ON "customer" (C_W_ID, C_D_ID, C_ID);
 
 -- For 2.7
 CREATE TABLE "customer_2-7" (
@@ -81,6 +85,7 @@ CREATE TABLE "customer_2-7" (
 	PRIMARY KEY (C_W_ID, C_D_ID, C_ID)
 );
 SELECT create_distributed_table('customer_2-7', 'c_id');
+CREATE INDEX "customer_2-7_idx" ON "customer_2-7" (C_W_ID, C_D_ID, C_ID);
 
 -- For 2.8
 CREATE TABLE "customer_2-8" (
@@ -119,6 +124,7 @@ CREATE TABLE item (
     I_DATA VARCHAR(50)
 );
 SELECT create_distributed_table('item', 'i_id');
+CREATE INDEX "item_idx" ON "item" (I_ID);
 
 -- Apply CRUD operations on vertically partitioned tables for order-line to enforce contraints
 
@@ -152,6 +158,7 @@ CREATE TABLE "order-line-item-constraint" (
     FOREIGN KEY (OL_I_ID) REFERENCES Item(I_ID)
 );
 SELECT create_distributed_table('order-line-item-constraint', 'ol_i_id', colocate_with => 'item');
+CREATE INDEX "order-line-item-constraint_idx" ON "order-line-item-constraint" (OL_W_ID, OL_D_ID, OL_O_ID);
 
 -- Apply CRUD operations on vertically partitioned tables for stock to enforce contraints
 CREATE TABLE Stock (
@@ -177,6 +184,7 @@ CREATE TABLE Stock (
     -- FOREIGN KEY (S_I_ID) REFERENCES Item(I_ID)
 );
 SELECT create_distributed_table('stock', 's_w_id', colocate_with => 'warehouse');
+CREATE INDEX "stock_idx" ON Stock (S_W_ID, S_I_ID);
 
 -- For 2.5
 CREATE TABLE "stock_2-5" (
@@ -187,3 +195,4 @@ CREATE TABLE "stock_2-5" (
     FOREIGN KEY (S_I_ID) REFERENCES Item(I_ID)
 );
 SELECT create_distributed_table('stock_2-5', 's_i_id', colocate_with => 'item');
+CREATE INDEX "stock_2-5_idx" ON "stock_2-5" (S_W_ID, S_I_ID);
