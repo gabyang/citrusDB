@@ -91,6 +91,8 @@ CREATE TABLE "customer_2-8" (
 	PRIMARY KEY (C_W_ID, C_D_ID, C_ID)
 );
 SELECT create_distributed_table('customer_2-8', 'c_id');
+CREATE INDEX "customer_2-8_C-O_idx" ON "customer_2-8" (C_W_ID, C_D_ID, C_ID);
+CREATE INDEX "customer_2-8_C-C_idx" ON "customer_2-8" (C_STATE);
 
 CREATE TABLE "order" (
     O_W_ID INT,
@@ -106,6 +108,8 @@ CREATE TABLE "order" (
     CHECK (O_CARRIER_ID IS NULL OR (O_CARRIER_ID BETWEEN 1 AND 10))
 );
 SELECT create_distributed_table('order', 'o_w_id', colocate_with => 'warehouse');
+CREATE INDEX "order_O-C_idx" ON "order" (O_W_ID, O_D_ID, O_C_ID);
+CREATE INDEX "order_O-OL_idx" ON "order" (O_W_ID, O_D_ID, O_ID);
 
 CREATE TABLE item (
     I_ID INT PRIMARY KEY,
@@ -136,6 +140,7 @@ CREATE TABLE "order-line" (
     -- FOREIGN KEY (OL_I_ID) REFERENCES Item(I_ID)
 );
 SELECT create_distributed_table('order-line', 'ol_w_id', colocate_with => 'warehouse');
+CREATE INDEX "order-line_OL-O_idx" ON "order-line" (OL_W_ID, OL_D_ID, OL_O_ID);
 
 -- New table created which is collocated with the item table to enforce the FK constraint
 CREATE TABLE "order-line-item-constraint" (
