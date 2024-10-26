@@ -57,6 +57,14 @@ def process_transaction(params):
         result = txn_func()
         print(f"Processed {txn_type}: {result}")
 
+    elif txn_type == 'I':
+        params_array = params.split(',')[1:]
+        warehouse_id = int(params_array[0])
+        district_id = int(params_array[1])
+        num_of_last_orders_to_examine = int(params_array[2])
+        result = txn_func(warehouse_id, district_id, num_of_last_orders_to_examine)
+        print(f"Processed {txn_type}: {result}")
+
     elif txn_type == 'P':
         values = params.split(',')
         print(values)

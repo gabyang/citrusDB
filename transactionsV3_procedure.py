@@ -306,72 +306,11 @@ class Transactions:
             # Step 1: Get the next available order number for the district
             # Can make use of the vertically partitioned District table (district_2-5)
             self.cursor.execute("""
-                SELECT d_next_o_id 
-                FROM "district_2-5"
-                WHERE d_w_id = %s AND d_id = %s
-            """, (w_id, d_id))
-            next_order_id = self.cursor.fetchone()[0]
-
-            # Step 2: Get the set of last L orders
-            self.cursor.execute("""
-                SELECT o_id
-                FROM "order"
-                WHERE o_w_id = %s AND o_d_id = %s
-                AND o_id >= %s AND o_id < %s
-            """, (w_id, d_id, next_order_id - l, next_order_id))
-            last_order_ids = [row[0] for row in self.cursor.fetchall()]
-
-            if not last_order_ids:
-                print("No orders found.")
-                self.cursor.execute("ROLLBACK")
-                return None
-
-            # Step 3: Get the set of all items contained in the last L orders
-            self.cursor.execute("""
-                SELECT ol_i_id, SUM(ol_quantity) as total_qty, COUNT(DISTINCT ol_o_id) as num_orders
-                FROM order_lines
-                WHERE ol_w_id = %s AND ol_d_id = %s AND ol_o_id = ANY(%s)
-                GROUP BY ol_i_id
-            """, (w_id, d_id, last_order_ids))
-            item_data = self.cursor.fetchall()
-
-            if not item_data:
-                print("No items found in the last orders.")
-                self.cursor.execute("ROLLBACK")
-                return None
-
-            # Step 4: Get the top 5 most popular items based on total quantity and number of orders
-            # Sorting by total_qty, then num_orders, and finally by item ID in case of ties
-            item_data_sorted = sorted(item_data, key=lambda x: (-x[1], -x[2], x[0]))[:5]
-
-            # Fetch item details (name and price)
-            item_details = []
-            for item in item_data_sorted:
-                self.cursor.execute("""
-                    SELECT i_name, i_price
-                    FROM item
-                    WHERE i_id = %s
-                """, (item[0],))
-                item_info = self.cursor.fetchone()
-                item_details.append({
-                    'i_id': item[0],
-                    'i_name': item_info[0],
-                    'i_price': item_info[1],
-                    'total_qty': item[1],
-                    'num_orders': item[2]
-                })
-
+                call find_most_popular_items(%s, %s, %s)
+            """, (w_id, d_id, l))
+            for notice in self.cursor.connection.notices:
+                print(notice.strip())
             self.cursor.execute("COMMIT")
-
-            # Output the popular items
-            print(f"District: (W_ID: {w_id}, D_ID: {d_id}), Last {l} Orders")
-            for idx, item in enumerate(item_details):
-                print(f"{idx + 1}. Item ID: {item['i_id']}, Name: {item['i_name']}, Price: {item['i_price']}")
-                print(f"   Total Quantity: {item['total_qty']}, Number of Orders: {item['num_orders']}")
-                print("------------------------------------------------------")
-
-            return item_details
-
         except (Exception, psycopg2.DatabaseError) as error:
             print(f"An error occurred: {error}")
             self.cursor.execute("ROLLBACK")
