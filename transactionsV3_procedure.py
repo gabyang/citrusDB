@@ -80,8 +80,8 @@ class Transactions:
             self.cursor.execute("BEGIN")
             # Finish this code, call the stored procedure
             self.cursor.execute("""
-                
-            """, ())
+                call new_order(%s, %s, %s, %s, %s, %s, %s)
+            """, (c_id, w_id, d_id, num_items, item_ids, supplier_warehouses, quantities))
             for notice in self.cursor.connection.notices:
                 print(notice.strip())
             self.cursor.execute("COMMIT")

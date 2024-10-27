@@ -35,24 +35,30 @@ def process_transaction(params):
     txn_start_time = time.time()
 
     if txn_type == "N":
-            item_numbers, supplier_warehouses, quantities = [], [], []
-            cleaned_params = [item.strip() for item in params[1:]]
-            variables = cast_type(cleaned_params)
-            total_orders = variables[-1]
-
-            for _ in range(total_orders):
-                order = file.readline().strip()
-                order_params = order.strip().split(",")
-                cleaned_order_params = [int(item.strip()) for item in order_params]
-                
-                item_numbers.append(cleaned_order_params[0])
-                supplier_warehouses.append(cleaned_order_params[1])
-                quantities.append(cleaned_order_params[2])
-
-            variables.extend([item_numbers, supplier_warehouses, quantities])
-            result = txn_func(*variables)
-            print(f"Processed {txn_type}: {result}")
-
+        split_params = params.split(",")
+        customer_id = int(split_params[1])
+        warehouse_id = int(split_params[2])
+        district_id = int(split_params[3])
+        num_items = int(split_params[4])
+        item_id_array= []
+        supply_warehouse_id = []
+        qty = [] 
+        for x in sys.stdin:
+            try:
+                int(x.split(",")[0]) 
+                input_array = x.split(",")
+                order_line_item_id = int(input_array[0])
+                order_line_supply_warehouse_id = int(input_array[1])
+                qty_item = int(input_array[2])
+                item_id_array.append(order_line_item_id)
+                supply_warehouse_id.append(order_line_supply_warehouse_id)
+                qty.append(qty_item)
+            except ValueError:
+                print('break!')
+                break
+        print(item_id_array, supply_warehouse_id, qty)
+        result = txn_func(warehouse_id,district_id,customer_id,num_items,item_id_array,supply_warehouse_id,qty)
+        print(f"Processed {txn_type}: {result}")
     elif txn_type == 'T':
         result = txn_func()
         print(f"Processed {txn_type}: {result}")
