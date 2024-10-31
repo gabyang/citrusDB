@@ -36,12 +36,10 @@ BEGIN
     ORDER BY O_ENTRY_D DESC
     LIMIT 1;
 
-    RAISE NOTICE 'O_ID: %', lastOrderID;
-
     -- Step 3: Find all customers C' in the same state as input customer and loop over them
     FOR custRecord IN
         SELECT C_ID AS customerID, C_W_ID AS warehouseID, C_D_ID AS districtID
-        FROM "customer"
+        FROM "customer_2-8"
         WHERE C_STATE = inputStateID
           AND (C_W_ID != inputC_W_ID OR C_D_ID != inputC_D_ID OR C_ID != inputC_ID)  -- Exclude the original customer
     LOOP
@@ -54,10 +52,6 @@ BEGIN
         ORDER BY O_ENTRY_D DESC
         LIMIT 1;
 
-        RAISE NOTICE 'lastOrderID_C: %', lastOrderID_C;
-        RAISE NOTICE 'inputC_W_ID: %', inputC_W_ID;
-        RAISE NOTICE 'inputC_D_ID: %', inputC_D_ID;
-        RAISE NOTICE 'lastOrderID: %', lastOrderID;
 
         -- Step 5: Check for matching items (at least two distinct matching items)
         SELECT COUNT(*) INTO itemCount
@@ -68,8 +62,7 @@ BEGIN
           AND OL1.OL_O_ID = lastOrderID
           AND OL2.OL_W_ID = custRecord.warehouseID
           AND OL2.OL_D_ID = custRecord.districtID
-          AND OL2.OL_O_ID = lastOrderID_C
-        GROUP BY OL1.OL_I_ID, OL2.OL_I_ID;
+          AND OL2.OL_O_ID = lastOrderID_C;
         RAISE NOTICE 'itemCount: %', itemCount;
 
         -- Step 6: If two distinct items match, display the similar customer

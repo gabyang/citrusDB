@@ -31,7 +31,7 @@ BEGIN
 
     -- Step 1: Fetch the next available order number (D_NEXT_O_ID) for the district
     SELECT d_next_o_id INTO next_available_order_number
-                FROM "district_2-5"
+                FROM "district"
                 WHERE d_w_id = p_w_id AND d_id = p_d_id;
     RAISE NOTICE 'next_available_order_number: %', next_available_order_number;
     RAISE NOTICE 'N%s', next_available_order_number;

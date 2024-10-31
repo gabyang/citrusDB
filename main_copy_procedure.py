@@ -56,13 +56,26 @@ def process_transaction(params):
             except ValueError:
                 print('break!')
                 break
-        print(item_id_array, supply_warehouse_id, qty)
-        result = txn_func(warehouse_id,district_id,customer_id,num_items,item_id_array,supply_warehouse_id,qty)
+        result = txn_func(customer_id,warehouse_id, district_id,num_items,item_id_array,supply_warehouse_id,qty)
+        print(f"Processed {txn_type}: {result}")
+    elif txn_type == "D": 
+        split_params = params.split(",")
+        warehouse_id = int(split_params[1])
+        carrier_id = int(split_params[2])
+        print(split_params)
+        result = txn_func(warehouse_id,carrier_id)
         print(f"Processed {txn_type}: {result}")
     elif txn_type == 'T':
         result = txn_func()
         print(f"Processed {txn_type}: {result}")
-
+    elif txn_type == 'S': 
+        params_array = params.split(',')[1:]
+        w_id =int(params_array[0])
+        d_id= int(params_array[1])
+        threshold= int(params_array[2])
+        num_last_orders=int(params_array[3])
+        result = txn_func(w_id, d_id, threshold, num_last_orders)
+        print(f"Processed {txn_type}: {result}")
     elif txn_type == 'I':
         params_array = params.split(',')[1:]
         warehouse_id = int(params_array[0])
@@ -70,7 +83,6 @@ def process_transaction(params):
         num_of_last_orders_to_examine = int(params_array[2])
         result = txn_func(warehouse_id, district_id, num_of_last_orders_to_examine)
         print(f"Processed {txn_type}: {result}")
-
     elif txn_type == 'P':
         values = params.split(',')
         print(values)
@@ -79,17 +91,21 @@ def process_transaction(params):
         c_id = int(values[3])   
         payment = float(values[4])  
         result = txn_func(c_w_id, c_d_id, c_id, payment)
-        print(f"Processed {txn_type}: {result}")
-        
+        print(f"Processed {txn_type}: {result}")       
     elif txn_type == 'O':
         values = params.split(',')
-        print(values)
         c_w_id = int(values[1])  
         c_d_id = int(values[2])  
         c_id = int(values[3])   
         result = txn_func(c_w_id, c_d_id, c_id)
         print(f"Processed {txn_type}: {result}")
-
+    elif txn_type == 'R':
+        values = params.split(',')
+        c_w_id = int(values[1])  
+        c_d_id = int(values[2])  
+        c_id = int(values[3])   
+        result = txn_func(c_w_id, c_d_id, c_id)
+        print(f"Processed {txn_type}: {result}")
     else:
         cleaned_params = [item.strip() for item in params[1:]]
         variables = cast_type(cleaned_params)
@@ -103,8 +119,10 @@ def process_transaction(params):
     total_exec_time += latency
 
 for line in sys.stdin:
+    values = line.split(',')
     # Read and parse transaction from stdin
-    process_transaction(line)
+    if values[0] in {'N', 'P', 'D', 'O', 'S', 'I', 'T', 'R'}:
+        process_transaction(line)
     
     # try:
     #     process_transaction()

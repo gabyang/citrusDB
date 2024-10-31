@@ -6,18 +6,16 @@ DROP_PROCEDURE_SQL="DROP PROCEDURE IF EXISTS delivery_txn(INT, INT);"
 # SQL command to create the procedure
 CREATE_PROCEDURE_SQL=$(cat <<EOF
 CREATE OR REPLACE PROCEDURE delivery_txn(W_ID INT, CARRIER_ID INT)
-
 LANGUAGE plpgsql
 AS \$\$
 DECLARE
     DISTRICT_NO INT;
     N INT; -- Order ID
     cust_ID INT; -- Customer ID
-    B DECIMAL(7, 2); -- Total amount of the order lines
-    OL_AMOUNT_SUM DECIMAL(7, 2); -- Sum of OL_AMOUNT
+    OL_AMOUNT_SUM DECIMAL(12, 2); -- Sum of OL_AMOUNT
     curr_time TIMESTAMP;
-    BEFORE_C_BALANCE INT;
-    AFTER_C_BALANCE INT;
+    BEFORE_C_BALANCE DECIMAL(12,2);
+    AFTER_C_BALANCE DECIMAL(12,2);
 BEGIN
     curr_time := CURRENT_TIMESTAMP;
     -- Loop through each district (1 to 10)
@@ -67,6 +65,12 @@ BEGIN
         UPDATE customer
         SET C_BALANCE = C_BALANCE + OL_AMOUNT_SUM,
             C_DELIVERY_CNT = C_DELIVERY_CNT + 1
+        WHERE C_W_ID = W_ID
+          AND C_D_ID = DISTRICT_NO
+          AND C_ID = cust_ID;
+
+        UPDATE "customer_2-7"
+        SET C_BALANCE = C_BALANCE + OL_AMOUNT_SUM
         WHERE C_W_ID = W_ID
           AND C_D_ID = DISTRICT_NO
           AND C_ID = cust_ID;

@@ -43,21 +43,20 @@ BEGIN
     -- RAISE NOTICE 'dist_info: %', dist_info;
 
     SELECT D_NEXT_O_ID INTO N
-    FROM district
+    FROM "district_2-5"
     WHERE D_W_ID = input_W_ID AND D_ID = input_D_ID;
     -- RAISE NOTICE 'N %', N;
 
     UPDATE district
     SET D_NEXT_O_ID = D_NEXT_O_ID + 1
-    WHERE D_W_ID = input_W_ID AND D_ID = input_W_ID;
+    WHERE D_W_ID = input_W_ID AND D_ID = input_D_ID;
 
     UPDATE "district_2-5"
     SET D_NEXT_O_ID = D_NEXT_O_ID + 1
-    WHERE D_W_ID = input_W_ID AND D_ID = input_W_ID;
+    WHERE D_W_ID = input_W_ID AND D_ID = input_D_ID;
 
     -- RAISE NOTICE '% % % % % % % %', input_W_ID, input_D_ID, N, input_D_ID, ORDER_ENTRY_DATE, NULL, input_NUM_ITEMS, O_ALL_LOCAL;
     
-    -- Create a new order
     INSERT INTO "order" (O_W_ID, O_D_ID, O_ID, O_C_ID, O_ENTRY_D, O_CARRIER_ID, O_OL_CNT, O_ALL_LOCAL) 
     VALUES (input_W_ID, input_D_ID, N, input_C_ID, ORDER_ENTRY_DATE, NULL, input_NUM_ITEMS, O_ALL_LOCAL);
 

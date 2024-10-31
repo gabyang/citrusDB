@@ -20,28 +20,32 @@ INSERT INTO customer (C_W_ID, C_D_ID, C_ID, C_FIRST, C_MIDDLE, C_LAST, C_STREET_
 VALUES 
     (1, 1, 1, 'John', 'A', 'Doe', '123 Main St', 'Apt 4', 'New York', 'NY', '10001', '1234567890', '2022-01-01 10:00:00', 'BC', 5000.00, 0.10, 100.00, 50.00, 5, 1, 'Regular customer'),
     (1, 1, 2, 'Jane', 'B', 'Smith', '456 Elm St', NULL, 'Los Angeles', 'CA', '90001', '0987654321', '2022-01-02 11:00:00', 'CC', 3000.00, 0.05, 200.00, 75.00, 10, 2, 'VIP customer'),
-    (1, 2, 1, 'Alice', 'C', 'Johnson', '789 Maple St', NULL, 'Chicago', 'IL', '60601', '1231231234', '2022-01-03 12:00:00', 'GC', 2000.00, 0.15, 150.00, 20.00, 3, 1, 'First-time customer');
+    (1, 2, 1, 'Alice', 'C', 'Johnson', '789 Maple St', NULL, 'Chicago', 'IL', '60601', '1231231234', '2022-01-03 12:00:00', 'GC', 2000.00, 0.15, 150.00, 20.00, 3, 1, 'First-time customer'),
+    (1, 2, 3, 'BoB', 'C', 'Builder', '123 Dude St', NULL, 'Chicago', 'IL', '22334', '1231231234', '2022-01-03 12:00:00', 'GC', 2000.00, 0.15, 150.00, 20.00, 3, 1, 'second-time customer');
 
 -- Inserting sample data into the customer_2-7 table
 INSERT INTO "customer_2-7" (C_W_ID, C_D_ID, C_ID, C_FIRST, C_MIDDLE, C_LAST, C_BALANCE)
 VALUES 
     (1, 1, 1, 'John', 'A', 'Doe', 100.00),
     (1, 1, 2, 'Jane', 'B', 'Smith', 200.00),
-    (1, 2, 1, 'Alice', 'C', 'Johnson', 150.00);
+    (1, 2, 1, 'Alice', 'C', 'Johnson', 150.00),
+    (1, 2,3 , 'BoB', 'C', 'Builder', 150.00);
 
 -- Inserting sample data into the customer_2-8 table
 INSERT INTO "customer_2-8" (C_W_ID, C_D_ID, C_ID, C_STATE)
 VALUES 
     (1, 1, 1, 'BC'),
     (1, 1, 2, 'CC'),
-    (1, 2, 1, 'GC');
+    (1, 2, 1, 'GC'),
+    (1, 2, 3, 'GC');
 
 -- Inserting sample data into the order table
 INSERT INTO "order" (O_W_ID, O_D_ID, O_ID, O_C_ID, O_CARRIER_ID, O_OL_CNT, O_ALL_LOCAL, O_ENTRY_D)
 VALUES 
     (1, 1, 1, 1, 1, 2, 1, '2024-10-20 14:00:00'),  -- Order 1
     (1, 1, 2, 2, 5, 1, 0, '2024-10-21 09:30:00'),  -- Order 2
-    (1, 2, 3, 1, NULL, 3, 1, '2024-10-22 11:15:00'); -- Order 3
+    (1, 2, 3, 1, NULL, 3, 1, '2024-10-22 11:15:00'), -- Order 3
+    (1, 2, 4, 3, NULL, 3, 1, '2024-10-22 11:15:00'); -- Order 4
 -- Inserting sample data into the order-line table
 INSERT INTO "order-line" (OL_W_ID, OL_D_ID, OL_O_ID, OL_NUMBER, OL_I_ID, OL_DELIVERY_D, OL_AMOUNT, OL_SUPPLY_W_ID, OL_QUANTITY, OL_DIST_INFO)
 VALUES 
@@ -49,7 +53,9 @@ VALUES
     (1, 1, 1, 2, 2, '2024-10-22 15:00:00', 29.99, 1, 1, 'S_DIST_1'),  -- Order Line 2 for Order 1
     (1, 1, 2, 1, 3, '2024-10-22 16:00:00', 39.99, 2, 3, 'S_DIST_1'),  -- Order Line 1 for Order 2
     (1, 2, 3, 1, 4, '2024-10-22 17:00:00', 49.99, 1, 1, 'S_DIST_2'),  -- Order Line 1 for Order 3
-    (1, 2, 3, 2, 5, '2024-10-22 17:00:00', 59.99, 2, 2, 'S_DIST_2');  -- Order Line 2 for Order 3
+    (1, 2, 3, 2, 5, '2024-10-22 17:00:00', 59.99, 2, 2, 'S_DIST_2'),  -- Order Line 2 for Order 3
+    (1, 2, 4, 1, 4, '2024-10-22 17:00:00', 49.99, 1, 1, 'S_DIST_2'),  -- Order Line 1 for Order 3
+    (1, 2, 4, 2, 5, '2024-10-22 17:00:00', 59.99, 2, 2, 'S_DIST_2');  -- Order Line 2 for Order 3
 
 -- Inserting sample data into the item table
 INSERT INTO item (I_ID, I_NAME, I_PRICE, I_IM_ID, I_DATA)
