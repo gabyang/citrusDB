@@ -91,12 +91,16 @@ else
         fi
     done
 
-    # Assign task file based on task_counter
-    task_file="${task_counter}.TXT"
-    echo "Process $SLURM_PROCID is working on task ${task_file}"
+    # Assign task file based on task_counter and execute respective txn
+    task_file="${task_counter}.txt"
+    # Uncomment following lines when ready to run all txn
+    # echo "Process $SLURM_PROCID is working on txn ${task_file}"
+    # python3 test-run/main.py ${task_counter} < ${task_file}
 
-    # Execute a job related to the task file
-    python3 test-run/main.py ${task_counter} "${task_file}"
+    # remove this when ready to run all txn
+    if [ ${task_counter} -eq 0 ]; then
+        python3 test-run/main.py ${task_counter} < ./test-run/test.txt
+    fi
 fi
 
 # To prevent the script from exiting before all processes are done

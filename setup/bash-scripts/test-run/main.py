@@ -1,13 +1,15 @@
 import sys
 import time
 
-from transactionsV3_copy import Transactions
+import query_statistics
 
-# get command line arguments
-client_number = sys.argv[1]
-transaction_file = sys.argv[2]  # edit hardcoded filename after done
+import metrics
+from transactions import Transactions
+
+client_number = sys.argv[1]  # Get client number from command line
 
 txn = Transactions("project", "cs4224b", 5098)
+# txn = Transactions()
 
 txn_funcs_dict = {
     "N": (txn.new_order_txn, txn.cast_new_order_type),
@@ -46,7 +48,7 @@ def process_transaction(params):
         total_orders = variables[-1]
 
         for _ in range(total_orders):
-            order = file.readline().strip()
+            order = next(sys.stdin)
             order_params = order.strip().split(",")
             cleaned_order_params = [int(item.strip()) for item in order_params]
 
@@ -75,20 +77,19 @@ def process_transaction(params):
     total_exec_time += latency
 
 
-filename = "test-run/test1.txt"
+for line in sys.stdin:
+    # Read and parse transaction from stdin
+    process_transaction(line.split(","))
 
-if filename:
-    try:
-        with open(filename, "r") as file:
-            for line in file:
-                process_transaction(line.split(","))
-    except FileNotFoundError:
-        print(f"Error: File '{filename}' not found.")
-    except Exception as e:
-        print(f"An error occurred: {str(e)}")
-else:
-    print("Please provide a filename as an argument.")
-    sys.exit(1)
+print("Measuring database statistics")
+query_statistics.query_statistics(txn.cursor)
+
+print("Measuring performance metrics")
+perf_metrics = metrics.performance_metrics(total_num_exec_xacts, total_exec_time, latencies)
+
+print(f"Client {client_number}: writing performance metrics")
+metrics.write_metrics_csv(client_number, perf_metrics)
+
 
 print(f"Total Transactions Executed: {total_num_exec_xacts}")
 print(f"Total Execution Time: {total_exec_time:.2f} seconds")

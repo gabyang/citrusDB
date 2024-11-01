@@ -1,16 +1,18 @@
 import csv
 import time
+
 # RESULTSDIR=$HOME/relevant_directory
-results_dir = "./metrics" # Insert later
+results_dir = "./"  # Insert later
+
 
 def query_statistics(cursor):
     measurements = [
         "SELECT SUM(W_YTD) FROM Warehouse",
         "SELECT SUM(D_YTD), SUM(D_NEXT_O_ID) FROM District",
         "SELECT SUM(C_BALANCE), SUM(C_YTD_PAYMENT), SUM(C_PAYMENT_CNT), SUM(C_DELIVERY_CNT) from Customer",
-        "SELECT MAX(O_ID), SUM(O_OL_CNT) FROM \"order\"",
-        "SELECT SUM(OL_AMOUNT), SUM(OL_QUANTITY) FROM \"order-line\"",
-        "SELECT SUM(S_QUANTITY), SUM(S_YTD), SUM(S_ORDER_CNT), SUM(S_REMOTE_CNT) FROM Stock"
+        'SELECT MAX(O_ID), SUM(O_OL_CNT) FROM "order"',
+        'SELECT SUM(OL_AMOUNT), SUM(OL_QUANTITY) FROM "order-line"',
+        "SELECT SUM(S_QUANTITY), SUM(S_YTD), SUM(S_ORDER_CNT), SUM(S_REMOTE_CNT) FROM Stock",
     ]
     resultPath = f"{results_dir}/database_state.csv"
     print(resultPath)
@@ -29,4 +31,3 @@ def query_statistics(cursor):
             for row in values:
                 for field in row:
                     f.write(str(field) + "\n")
-
