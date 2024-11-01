@@ -76,12 +76,13 @@ class Transactions:
             supplier_warehouses (List[int]): List of supplier warehouse IDs
             quantities (List[int]): List of quantities for each item
         """
+        print(c_id, w_id, d_id, num_items, item_ids, supplier_warehouses, quantities)
         try:
             self.cursor.execute("BEGIN")
             # Finish this code, call the stored procedure
             self.cursor.execute("""
-                
-            """, ())
+                call new_order(%s, %s, %s, %s, %s, %s, %s)
+            """, (w_id,d_id ,c_id, num_items, item_ids, supplier_warehouses, quantities))
             for notice in self.cursor.connection.notices:
                 print(notice.strip())
             self.cursor.execute("COMMIT")
@@ -137,69 +138,20 @@ class Transactions:
             carrier_id (int): Carrier ID
         """
         try:
-            # self.cursor.execute("BEGIN")
-
-            # Process steps for district numbers 1 through 10
-            for district_no in range(1, 11):
-
-                # Step 1a: Find the smallest order number O_ID for the district with O_CARRIER_ID = null
-                self.cursor.execute("""
-                    SELECT MIN(o_id) 
-                    FROM "order" 
-                    WHERE o_w_id = %s AND o_d_id = %s AND o_carrier_id IS NULL
-                    """, (w_id, district_no))
-                next_order_id = self.cursor.fetchone()
-
-                if next_order_id is None or next_order_id[0] is None:
-                    # If no valid order is found, continue to the next district
-                    continue
-
-                next_order_id = next_order_id[0]
-                
-                # Step 1b: Find the customer who placed the order
-                self.cursor.execute("""
-                    SELECT o_c_id 
-                    FROM "order" 
-                    WHERE o_w_id = %s AND o_d_id = %s AND o_id = %s
-                    """, (w_id, district_no, next_order_id))
-                customer_id = self.cursor.fetchone()[0]
-
-                # Step 1b: Update the order by setting O_CARRIER_ID
-                self.cursor.execute("""
-                    UPDATE "order" 
-                    SET o_carrier_id = %s 
-                    WHERE o_w_id = %s AND o_d_id = %s AND o_id = %s
-                    """, (carrier_id, w_id, district_no, next_order_id))
-                
-                # Step 1c: Update all the order lines for this order by setting OL_DELIVERY_D to the current date and time
-                delivery_time = datetime.now(timezone.utc)
-                self.cursor.execute("""
-                    UPDATE "order-line" 
-                    SET ol_delivery_d = %s 
-                    WHERE ol_w_id = %s AND ol_d_id = %s AND ol_o_id = %s
-                    """, (delivery_time, w_id, district_no, next_order_id))
-
-                # Step 1d: Calculate the total amount from all order lines for this order
-                self.cursor.execute("""
-                    SELECT SUM(ol_amount) 
-                    FROM "order-line" 
-                    WHERE ol_w_id = %s AND ol_d_id = %s AND ol_o_id = %s
-                    """, (w_id, district_no, next_order_id))
-                total_amount = self.cursor.fetchone()[0]
-                
-                
-                # Step 1d: Update the customer balance and increment the delivery count
-                self.cursor.execute("""
-                    UPDATE customer_param 
-                    SET c_balance = c_balance + %s, c_delivery_cnt = c_delivery_cnt + 1 
-                    WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s
-                    """, (total_amount, w_id, district_no, customer_id))
+            self.cursor.execute("BEGIN")
+            # Step 1: Get customer name and balance
+            self.cursor.execute("""
+                call delivery_txn(%s,%s);
+            """, (w_id, carrier_id))
+            # Capture any notices that were raised
+            for notice in self.cursor.connection.notices:
+                print(notice.strip())
+            self.cursor.execute("COMMIT")
 
         except (Exception, psycopg2.DatabaseError) as error:
             print(f"An error occurred: {error}")
             self.cursor.execute("ROLLBACK")
-
-        return None
+            return None
 
     # 2.4 order-status transaction
     def order_status_txn(self, c_w_id, c_d_id, c_id):
@@ -245,40 +197,20 @@ class Transactions:
             num_last_orders (int): Number of last orders to be examined L
         """
         try:
-            # self.cursor.execute("BEGIN")
-
-            # Step 1: Get the next available order number for the district
-            self.cursor.execute("SELECT d_next_o_id FROM district WHERE d_w_id = %s AND d_id = %s", (w_id, d_id))
-            next_order_id = self.cursor.fetchone()[0]
-
-            # Step 2: Get the set of items from the last L orders
+            self.cursor.execute("BEGIN")
+            # Step 1: Get customer name and balance
             self.cursor.execute("""
-                SELECT DISTINCT ol_i_id
-                FROM "order-line"
-                WHERE ol_w_id = %s AND ol_d_id = %s AND ol_o_id >= %s AND ol_o_id < %s
-                """, (w_id, d_id, next_order_id - num_last_orders, next_order_id))
-            item_ids = [row[0] for row in self.cursor.fetchall()]
-
-            if not item_ids:
-                print("No items found in the last orders.")
-                return 0
-
-            # Step 3: Check stock levels for the items and count how many are below the threshold
-            query = 'SELECT COUNT(*) FROM "stock_2-5" WHERE s_w_id = %s AND s_i_id = ANY(%s) AND s_quantity < %s'
-            self.cursor.execute(query, (w_id, item_ids, threshold))
-            low_stock_count = self.cursor.fetchone()[0]
-
-            # Output the total number of items in S where the stock quantity is below the threshold
-            print(f"Number of items below threshold: {low_stock_count}")
-
-            # self.cursor.execute("COMMIT")
-
-            return low_stock_count
+                call report_low_stock_items(%s,%s,%s,%s);
+            """, (w_id, d_id, threshold, num_last_orders))
+            # Capture any notices that were raised
+            for notice in self.cursor.connection.notices:
+                print(notice.strip())
+            self.cursor.execute("COMMIT")
 
         except (Exception, psycopg2.DatabaseError) as error:
             print(f"An error occurred: {error}")
             self.cursor.execute("ROLLBACK")
-            return 0
+            return None
 
     # 2.6 popular-item transaction
     def popular_item_txn(self, w_id, d_id, l):
@@ -306,72 +238,11 @@ class Transactions:
             # Step 1: Get the next available order number for the district
             # Can make use of the vertically partitioned District table (district_2-5)
             self.cursor.execute("""
-                SELECT d_next_o_id 
-                FROM "district_2-5"
-                WHERE d_w_id = %s AND d_id = %s
-            """, (w_id, d_id))
-            next_order_id = self.cursor.fetchone()[0]
-
-            # Step 2: Get the set of last L orders
-            self.cursor.execute("""
-                SELECT o_id
-                FROM "order"
-                WHERE o_w_id = %s AND o_d_id = %s
-                AND o_id >= %s AND o_id < %s
-            """, (w_id, d_id, next_order_id - l, next_order_id))
-            last_order_ids = [row[0] for row in self.cursor.fetchall()]
-
-            if not last_order_ids:
-                print("No orders found.")
-                self.cursor.execute("ROLLBACK")
-                return None
-
-            # Step 3: Get the set of all items contained in the last L orders
-            self.cursor.execute("""
-                SELECT ol_i_id, SUM(ol_quantity) as total_qty, COUNT(DISTINCT ol_o_id) as num_orders
-                FROM order_lines
-                WHERE ol_w_id = %s AND ol_d_id = %s AND ol_o_id = ANY(%s)
-                GROUP BY ol_i_id
-            """, (w_id, d_id, last_order_ids))
-            item_data = self.cursor.fetchall()
-
-            if not item_data:
-                print("No items found in the last orders.")
-                self.cursor.execute("ROLLBACK")
-                return None
-
-            # Step 4: Get the top 5 most popular items based on total quantity and number of orders
-            # Sorting by total_qty, then num_orders, and finally by item ID in case of ties
-            item_data_sorted = sorted(item_data, key=lambda x: (-x[1], -x[2], x[0]))[:5]
-
-            # Fetch item details (name and price)
-            item_details = []
-            for item in item_data_sorted:
-                self.cursor.execute("""
-                    SELECT i_name, i_price
-                    FROM item
-                    WHERE i_id = %s
-                """, (item[0],))
-                item_info = self.cursor.fetchone()
-                item_details.append({
-                    'i_id': item[0],
-                    'i_name': item_info[0],
-                    'i_price': item_info[1],
-                    'total_qty': item[1],
-                    'num_orders': item[2]
-                })
-
+                call find_most_popular_items(%s, %s, %s)
+            """, (w_id, d_id, l))
+            for notice in self.cursor.connection.notices:
+                print(notice.strip())
             self.cursor.execute("COMMIT")
-
-            # Output the popular items
-            print(f"District: (W_ID: {w_id}, D_ID: {d_id}), Last {l} Orders")
-            for idx, item in enumerate(item_details):
-                print(f"{idx + 1}. Item ID: {item['i_id']}, Name: {item['i_name']}, Price: {item['i_price']}")
-                print(f"   Total Quantity: {item['total_qty']}, Number of Orders: {item['num_orders']}")
-                print("------------------------------------------------------")
-
-            return item_details
-
         except (Exception, psycopg2.DatabaseError) as error:
             print(f"An error occurred: {error}")
             self.cursor.execute("ROLLBACK")
@@ -390,67 +261,14 @@ class Transactions:
             d. District name (D_NAME)
         """
         try:
-            # self.cursor.execute("BEGIN")
-
-            # Step 1: Get the top 10 customers by balance in non-ascending order
-            # NOTE: This query is SLOW AF - to be optimized later
+            self.cursor.execute("BEGIN")
+            # Finish this code, call the stored procedure
             self.cursor.execute("""
-                SELECT 
-                    C_FIRST, C_MIDDLE, C_LAST, C_BALANCE, 
-                    C_W_ID, C_D_ID
-                FROM "customer_2-7" AS cust
-                JOIN warehouse ON cust.c_w_id = warehouse.w_id 
-                JOIN district ON cust.c_d_id = district.d_id 
-                ORDER BY C_BALANCE DESC 
-                LIMIT 10
-            """)
-            
-            top_customers = self.cursor.fetchall()
-            c_w_ids = [row[4] for row in top_customers]
-            c_d_ids = [row[5] for row in top_customers]
-
-            warehouse_query = """
-                WITH warehouse_ids AS (
-                    SELECT unnest(%s::int[]) AS w_id, generate_subscripts(%s::int[], 1) AS ord
-                )
-                SELECT w.w_name
-                FROM warehouse w
-                JOIN warehouse_ids wi ON w.w_id = wi.w_id
-                ORDER BY wi.ord;
-            """
-            self.cursor.execute(warehouse_query, (c_w_ids, c_w_ids))
-            warehouse_names = [row[0] for row in self.cursor.fetchall()]
-
-            # Step 3: Query for district names similarly
-            district_query = """
-                WITH district_ids AS (
-                    SELECT unnest(%s::int[]) AS d_id, unnest(%s::int[]) AS w_id, generate_subscripts(%s::int[], 1) AS ord
-                )
-                SELECT d.d_name
-                FROM district d
-                JOIN district_ids di ON d.d_id = di.d_id AND d.d_w_id = di.w_id
-                ORDER BY di.ord;
-            """
-            self.cursor.execute(district_query, (c_d_ids, c_w_ids, c_w_ids))
-            district_names = [row[0] for row in self.cursor.fetchall()]
-
-            # Output the details of each customer
-            # for customer in top_customers:
-            #     c_first = customer[0]
-            #     c_middle = customer[1]
-            #     c_last = customer[2]
-            #     c_balance = customer[3]
-            #     w_name = customer[]
-            #     d_name = customer[5]
-                
-                # print(f"Customer: {c_first} {c_middle} {c_last}")
-                # print(f"Outstanding Balance: {c_balance}")
-                # print(f"Warehouse Name: {w_name}")
-                # print(f"District Name: {d_name}")
-                # print("----------------------------------")
-
-            # self.cursor.execute("COMMIT")
-
+                call gettop10customers();
+            """, ())
+            for notice in self.cursor.connection.notices:
+                print(notice.strip())
+            self.cursor.execute("COMMIT")
             return None
 
         except (Exception, psycopg2.DatabaseError) as error:
@@ -476,54 +294,14 @@ class Transactions:
         """
         try:
             self.cursor.execute("BEGIN")
-
-            # Step 1: Get the state of the given customer
-            self.cursor.execute("SELECT c_state_id FROM customer WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s", 
-                                (c_w_id, c_d_id, c_id))
-            customer_state_id = self.cursor.fetchone()[0]
-
-            # Step 2: Get the last order for the given customer
+            # Step 1: Get customer name and balance
             self.cursor.execute("""
-                SELECT o_id 
-                FROM "order" 
-                WHERE o_w_id = %s AND o_d_id = %s AND o_c_id = %s 
-                ORDER BY o_entry_d DESC LIMIT 1
-                """, (c_w_id, c_d_id, c_id))
-            customer_last_order_id = self.cursor.fetchone()[0]
-
-            # Step 3: Get the item IDs from the last order of the given customer
-            self.cursor.execute("""
-                SELECT ol_i_id 
-                FROM "order-line"
-                WHERE ol_w_id = 1 AND ol_d_id = 1 AND ol_o_id = 1
-                """, (c_w_id, c_d_id, customer_last_order_id))
-            customer_item_ids = [row[0] for row in self.cursor.fetchall()]
-
-            # Step 4: Find related customers in the same state who have at least two items in common in their last order
-            # c_state_id should be c_state as per the schema
-            self.cursor.execute("""
-                SELECT DISTINCT c2.c_w_id, c2.c_d_id, c2.c_id 
-                FROM "customer_2-8" c1
-                JOIN "customer_2-8" c2 ON c1.c_state = c2.c_state
-                JOIN "order" o1 ON o1.o_w_id = c1.c_w_id AND o1.o_d_id = c1.c_d_id AND o1.o_c_id = c1.c_id
-                JOIN "order" o2 ON o2.o_w_id = c2.c_w_id AND o2.o_d_id = c2.c_d_id AND o2.o_c_id = c2.c_id
-                JOIN "order-line" ol1 ON ol1.ol_w_id = o1.o_w_id AND ol1.ol_d_id = o1.o_d_id AND ol1.ol_o_id = o1.o_id
-                JOIN "order-line" ol2 ON ol2.ol_w_id = o2.o_w_id AND ol2.ol_d_id = o2.o_d_id AND ol2.ol_o_id = o2.o_id
-                WHERE c1.c_state = %s AND c1.c_w_id = %s AND c1.c_d_id = %s AND c1.c_id = %s
-                AND ol1.ol_i_id = ol2.ol_i_id
-                GROUP BY c2.c_w_id, c2.c_d_id, c2.c_id
-                HAVING COUNT(ol1.ol_i_id) >= 2
-            """, (customer_state_id, c_w_id, c_d_id, c_id))
-
-            related_customers = self.cursor.fetchall()
-
-            # Output the related customers
-            for related_customer in related_customers:
-                print(f"Related Customer: Warehouse ID: {related_customer[0]}, District ID: {related_customer[1]}, Customer ID: {related_customer[2]}")
-
+                call find_related_customers(%s,%s,%s);
+            """, (c_w_id, c_d_id, c_id))
+            # Capture any notices that were raised
+            for notice in self.cursor.connection.notices:
+                print(notice.strip())
             self.cursor.execute("COMMIT")
-
-            return related_customers
 
         except (Exception, psycopg2.DatabaseError) as error:
             print(f"An error occurred: {error}")

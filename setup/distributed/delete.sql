@@ -8,13 +8,14 @@ DELETE FROM "order-line-item-constraint";
 DELETE FROM "order-line";
 DELETE FROM "customer_2-8";
 DELETE FROM "customer_2-7";
-DELETE FROM "customer_2-5";
 DELETE FROM "customer";  -- This has dependencies on district
 DELETE FROM "order";      -- This has dependencies on customer
 DELETE FROM "stock_2-5";
 DELETE FROM Stock;        -- This has dependencies on warehouse
 DELETE FROM district;     -- This has dependencies on warehouse
+DELETE FROM "district_2-5";     -- This has dependencies on warehouse
 DELETE FROM warehouse;    -- Last to delete
+DELETE FROM "item";    -- Last to delete
 
 -- Enable foreign key checks if they were disabled
 -- For example, in PostgreSQL you would need to use "SET session_replication_role = 'origin';"

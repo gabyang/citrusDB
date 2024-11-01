@@ -62,6 +62,9 @@ BEGIN
         (SELECT d_city FROM district WHERE d_w_id = p_c_w_id AND d_id = p_c_d_id),
         (SELECT d_state FROM district WHERE d_w_id = p_c_w_id AND d_id = p_c_d_id),
         (SELECT d_zip FROM district WHERE d_w_id = p_c_w_id AND d_id = p_c_d_id);
+
+    RAISE NOTICE 'Payment Amount: %', p_payment;
+
 END;
 \$\$;
 EOF

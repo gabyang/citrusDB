@@ -1,6 +1,9 @@
 # Project DistribuShop
 An e-commerce application for processing transactions and distributing data in a sharded database using CitusDB.
 
+# First Time Local setup on a non-distributed database single node PostgreSQL
+Refer to a nicely written notion document here: https://oxidized-wolf-330.notion.site/Project-CitusDB-local-set-up-50ad2880b7a54e3b90db7d8e5b402b92
+
 # First Time Local Setup CitusDB (Docker)
 
 Run docker-compose to build image with 5 nodes. 1 master and 4 worker nodes.
