@@ -23,21 +23,24 @@ BEGIN
     WHERE d_w_id = p_c_w_id AND d_id = p_c_d_id;
 
     UPDATE customer
-    SET c_balance = c_balance - p_payment,
-        c_ytd_payment = c_ytd_payment + p_payment,
-        c_payment_cnt = c_payment_cnt + 1
+    SET c_ytd_payment = c_ytd_payment + p_payment,
+    c_payment_cnt = c_payment_cnt + 1
+    WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id;
+
+    UPDATE "customer_2-7"
+    SET c_balance = c_balance - p_payment
     WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id;
 
     RAISE NOTICE 'Customer Identifier: (C_W_ID: %, C_D_ID: %, C_ID: %)', p_c_w_id, p_c_d_id, p_c_id;
     RAISE NOTICE 'Customer Name: %, %, %',
-        (SELECT c_first FROM customer WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id),
-        (SELECT c_middle FROM customer WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id),
-        (SELECT c_last FROM customer WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id);
+        (SELECT c_first FROM "customer_2-7" WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id),
+        (SELECT c_middle FROM "customer_2-7" WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id),
+        (SELECT c_last FROM "customer_2-7" WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id);
     RAISE NOTICE 'Customer Address: %, %, %, %, %',
         (SELECT C_STREET_1 FROM customer WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id),
         (SELECT C_STREET_2 FROM customer WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id),
         (SELECT C_CITY FROM customer WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id),
-        (SELECT C_STATE FROM customer WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id),
+        (SELECT C_STATE FROM "customer_2-8" WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id),
         (SELECT C_ZIP FROM customer WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id);
     RAISE NOTICE 'Customer Info: %, %, %, %, %, %',
         (SELECT C_PHONE FROM customer WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id),
@@ -45,7 +48,7 @@ BEGIN
         (SELECT C_CREDIT FROM customer WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id),
         (SELECT C_CREDIT_LIM FROM customer WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id),
         (SELECT C_DISCOUNT FROM customer WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id),
-        (SELECT C_BALANCE FROM customer WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id);
+        (SELECT C_BALANCE FROM "customer_2-7" WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id);
 
     -- Output warehouse address
     RAISE NOTICE 'Warehouse Address: %, %, %, %, %',
@@ -63,6 +66,7 @@ BEGIN
         (SELECT d_state FROM district WHERE d_w_id = p_c_w_id AND d_id = p_c_d_id),
         (SELECT d_zip FROM district WHERE d_w_id = p_c_w_id AND d_id = p_c_d_id);
 
+    RAISE NOTICE 'Payment Amount: %', p_payment;
 
 END;
 \$\$;

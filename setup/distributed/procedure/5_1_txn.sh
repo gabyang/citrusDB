@@ -34,6 +34,17 @@ DECLARE
     STOCK_REMOTE_CNT INT;            -- Remote order count
     i INT;                       -- Loop counter
     dist_info VARCHAR(24);
+    items_loop RECORD;           -- to output items
+    item_name TEXT;
+
+    -- Declare arrays to store item details
+    item_numbers INT[];
+    item_names TEXT[];
+    supplier_warehouses INT[];
+    quantities INT[];
+    ol_amounts NUMERIC[];
+    stock_quantities INT[];
+
 BEGIN
     dist_info := 'S_DIST_' || input_D_ID;
 
@@ -46,10 +57,6 @@ BEGIN
     FROM "district_2-5"
     WHERE D_W_ID = input_W_ID AND D_ID = input_D_ID;
     -- RAISE NOTICE 'N %', N;
-
-    UPDATE district
-    SET D_NEXT_O_ID = D_NEXT_O_ID + 1
-    WHERE D_W_ID = input_W_ID AND D_ID = input_D_ID;
 
     UPDATE "district_2-5"
     SET D_NEXT_O_ID = D_NEXT_O_ID + 1
@@ -67,10 +74,20 @@ BEGIN
             EXIT;  -- Exit loop as we only need one non-local supplier to set this to 0
         END IF;
 
+        -- Fetch the item price and stock details
+        SELECT I_PRICE, I_NAME INTO ITEM_PRICE, item_name
+        FROM item
+        WHERE I_ID = input_ITEM_NUMBER[i];
+
         -- a. Get the stock quantity for the item and supplier warehouse
-        SELECT S_QUANTITY, S_ORDER_CNT, S_REMOTE_CNT, S_YTD 
-        INTO STOCK_QUANTITY, STOCK_ORDER_CNT, STOCK_REMOTE_CNT, STOCK_YTD
+        SELECT S_ORDER_CNT, S_REMOTE_CNT, S_YTD 
+        INTO STOCK_ORDER_CNT, STOCK_REMOTE_CNT, STOCK_YTD
         FROM Stock
+        WHERE S_I_ID = input_ITEM_NUMBER[i] AND S_W_ID = input_SUPPLIER_WAREHOUSE[i];
+
+        SELECT S_QUANTITY 
+        INTO STOCK_QUANTITY
+        FROM "stock_2-5"
         WHERE S_I_ID = input_ITEM_NUMBER[i] AND S_W_ID = input_SUPPLIER_WAREHOUSE[i];
 
         SELECT I_PRICE 
@@ -87,15 +104,14 @@ BEGIN
         END IF;
 
         -- d. Update the stock
-        UPDATE Stock
-            SET S_QUANTITY = ADJUSTED_QTY,
-                S_YTD = STOCK_YTD + input_QUANTITY[i],
-                S_ORDER_CNT = STOCK_ORDER_CNT + 1,
-                S_REMOTE_CNT = STOCK_REMOTE_CNT + CASE WHEN input_SUPPLIER_WAREHOUSE[i] != input_W_ID THEN 1 ELSE 0 END
+        UPDATE "stock"
+            SET S_YTD = STOCK_YTD + input_QUANTITY[i],
+            S_ORDER_CNT = STOCK_ORDER_CNT + 1,
+            S_REMOTE_CNT = STOCK_REMOTE_CNT + CASE WHEN input_SUPPLIER_WAREHOUSE[i] != input_W_ID THEN 1 ELSE 0 END
         WHERE S_I_ID = input_ITEM_NUMBER[i] AND S_W_ID = input_SUPPLIER_WAREHOUSE[i];
 
         UPDATE "stock_2-5"
-        SET S_QUANTITY = ADJUSTED_QTY
+            SET S_QUANTITY = ADJUSTED_QTY
         WHERE S_I_ID = input_ITEM_NUMBER[i] AND S_W_ID = input_SUPPLIER_WAREHOUSE[i];
 
         -- e. Calculate the item amount
@@ -110,14 +126,31 @@ BEGIN
 
         INSERT INTO "order-line-item-constraint" (OL_W_ID, OL_D_ID, OL_O_ID, OL_NUMBER, OL_I_ID)
         VALUES (input_W_ID, input_D_ID, N, i, input_ITEM_NUMBER[i]);
+
+        -- Collect item details in arrays
+        item_numbers := array_append(item_numbers, input_ITEM_NUMBER[i]);
+        item_names := array_append(item_names, item_name);
+        supplier_warehouses := array_append(supplier_warehouses, input_SUPPLIER_WAREHOUSE[i]);
+        quantities := array_append(quantities, input_QUANTITY[i]);
+        ol_amounts := array_append(ol_amounts, ITEM_AMOUNT);
+        stock_quantities := array_append(stock_quantities, ADJUSTED_QTY);
+
     END LOOP;
     SELECT D_TAX INTO DISTRICT_TAX from "district" WHERE D_W_ID = input_W_ID AND D_ID = input_D_ID;
 
     SELECT W_TAX INTO WAREHOUSE_TAX from "warehouse" WHERE W_ID = input_W_ID;
 
-    SELECT C_LAST, C_CREDIT, C_DISCOUNT 
-    INTO CUSTOMER_LAST, CUSTOMER_CREDIT, CUSTOMER_DISCOUNT 
+    SELECT C_CREDIT, C_DISCOUNT 
+    INTO CUSTOMER_CREDIT, CUSTOMER_DISCOUNT 
     from "customer" 
+    WHERE 
+    C_W_ID = input_W_ID 
+    AND C_D_ID = input_D_ID 
+    AND C_ID = input_C_ID;
+
+    SELECT C_LAST 
+    INTO CUSTOMER_LAST 
+    from "customer_2-7" 
     WHERE 
     C_W_ID = input_W_ID 
     AND C_D_ID = input_D_ID 
@@ -130,6 +163,12 @@ BEGIN
     RAISE NOTICE 'W_TAX: %, D_TAX: %', WAREHOUSE_TAX, DISTRICT_TAX;
     RAISE NOTICE 'O_ID : %, O_ENTRY_D : %', N, ORDER_ENTRY_DATE;
     RAISE NOTICE 'NUM_ITEMS : %, TOTAL_AMOUNT: %', input_NUM_ITEMS, TOTAL_AMOUNT;
+
+    FOR i IN 1..array_length(item_numbers, 1) LOOP
+        RAISE NOTICE 'Item Number: %, Name: %, Supplier Warehouse: %, Quantity: %, Amount: %, Stock Quantity: %',
+            item_numbers[i], item_names[i], supplier_warehouses[i], quantities[i], ol_amounts[i], stock_quantities[i];
+    END LOOP;
+
 END;
 \$\$;
 EOF

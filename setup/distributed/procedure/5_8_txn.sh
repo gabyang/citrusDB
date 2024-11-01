@@ -63,7 +63,6 @@ BEGIN
           AND OL2.OL_W_ID = custRecord.warehouseID
           AND OL2.OL_D_ID = custRecord.districtID
           AND OL2.OL_O_ID = lastOrderID_C;
-        RAISE NOTICE 'itemCount: %', itemCount;
 
         -- Step 6: If two distinct items match, display the similar customer
         IF itemCount >= 2 THEN

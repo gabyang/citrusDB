@@ -1,7 +1,7 @@
 import sys
 import time
 
-from transactions import Transactions
+from transactionsV3_procedure_ideal import Transactions
 from metrics import metrics, query_statistics
 
 client_number = sys.argv[1]  # Get client number from command line

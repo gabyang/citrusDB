@@ -54,17 +54,14 @@ BEGIN
         WHERE OL_W_ID = W_ID
           AND OL_D_ID = DISTRICT_NO
           AND OL_O_ID = N;
-        RAISE NOTICE 'OL_AMOUNT_SUM %', OL_AMOUNT_SUM;
-        SELECT C_BALANCE into BEFORE_C_BALANCE FROM customer WHERE C_W_ID = W_ID
+        SELECT C_BALANCE into BEFORE_C_BALANCE FROM "customer_2-7" WHERE C_W_ID = W_ID
           AND C_D_ID = DISTRICT_NO
           AND C_ID = cust_ID;
 
-        RAISE NOTICE 'BEFORE_C_BALANCE %', BEFORE_C_BALANCE;
         
         -- Increment the customer's balance by the total OL_AMOUNT (B) and delivery count
         UPDATE customer
-        SET C_BALANCE = C_BALANCE + OL_AMOUNT_SUM,
-            C_DELIVERY_CNT = C_DELIVERY_CNT + 1
+        SET C_DELIVERY_CNT = C_DELIVERY_CNT + 1
         WHERE C_W_ID = W_ID
           AND C_D_ID = DISTRICT_NO
           AND C_ID = cust_ID;
@@ -75,10 +72,9 @@ BEGIN
           AND C_D_ID = DISTRICT_NO
           AND C_ID = cust_ID;
 
-        SELECT C_BALANCE into AFTER_C_BALANCE FROM customer WHERE C_W_ID = W_ID
+        SELECT C_BALANCE into AFTER_C_BALANCE FROM "customer_2-7" WHERE C_W_ID = W_ID
           AND C_D_ID = DISTRICT_NO
           AND C_ID = cust_ID;
-        RAISE NOTICE 'AFTER_C_BALANCE %', AFTER_C_BALANCE;
 
     END LOOP;
 END;

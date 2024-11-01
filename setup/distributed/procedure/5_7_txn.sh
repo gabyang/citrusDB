@@ -21,7 +21,7 @@ BEGIN
         C_W_ID,
         C_D_ID
     FROM
-        Customer;
+        "customer_2-7";
 
     CREATE TEMP TABLE temp_warehouse_data AS
     SELECT
