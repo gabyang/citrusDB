@@ -1,6 +1,8 @@
+import os
 from datetime import datetime, timezone
 
 import psycopg2
+from dotenv import load_dotenv
 from psycopg2 import sql
 
 
@@ -8,9 +10,12 @@ class Transactions:
     cursor = None
     conn = None
 
-    def __init__(self, database, username, port):
-        host = "localhost"
-
+    def __init__(self):
+        load_dotenv()
+        host = os.getenv("DATABASE_HOST")
+        database = os.getenv("DATABASE_NAME")
+        username = os.getenv("DATABASE_USERNAME")
+        port = int(os.getenv("DATABASE_PORT", "5432"))
         try:
             self.conn = psycopg2.connect(host=host, database=database, user=username, port=port)
             print("Successfully connected to the PostgreSQL database")

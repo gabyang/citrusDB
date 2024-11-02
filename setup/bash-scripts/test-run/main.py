@@ -9,8 +9,7 @@ from transactions import Transactions
 client_number = sys.argv[1]  # Get client number from command line
 results_dir = sys.argv[2]  # Get output directory from command line
 
-txn = Transactions("project", "cs4224b", 5098)
-# txn = Transactions()
+txn = Transactions()
 
 txn_funcs_dict = {
     "N": (txn.new_order_txn, txn.cast_new_order_type),

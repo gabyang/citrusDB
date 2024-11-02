@@ -65,10 +65,8 @@ if [ ${REMAINDER} -eq 0 ]; then
     if [ "${HOSTNAME}" = "$coordinator_node" ]; then
         echo "Process $SLURM_PROCID on ${HOSTNAME} will be executing as the Citus coordinator node"
         ${INSTALLDIR}/bin/psql -U $PGUSER -d $PGDATABASE -c "SELECT citus_set_coordinator_host('${HOSTNAME}', $PGPORT);"
-        # ${INSTALLDIR}/bin/psql -U $PGUSER -d $PGDATABASE -c "SET citus.enable_repartition_joins = true;"
-        # ${INSTALLDIR}/bin/psql -U $PGUSER -d $PGDATABASE -c "SET citus.enable_repartition_joins = 'true';"
-
         ${INSTALLDIR}/bin/psql -U $PGUSER -d $PGDATABASE -c "ALTER DATABASE $PGDATABASE SET citus.enable_repartition_joins = 'true';"
+        
         # set up the worker nodes
         sleep 30 # wait for the worker nodes to start
         for ((i=1; i<${SLURM_NNODES}; i++)); do
