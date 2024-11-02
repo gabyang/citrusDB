@@ -14,7 +14,9 @@ DATADIR=/tmp/team${TEAM_ID}-data
 
 
 mkdir -p ${DATADIR}
-${INSTALLDIR}/bin/initdb -D ${DATADIR}
+# ${INSTALLDIR}/bin/initdb -D ${DATADIR}
+${INSTALLDIR}/bin/initdb --locale=POSIX -D ${DATADIR}
+
 if [ -e ${DATADIR}/postgresql.conf ]; then
 	grep -q citus ${DATADIR}/postgresql.conf
 	if [ $? -ne 0 ]; then

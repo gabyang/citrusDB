@@ -3,15 +3,20 @@ import statistics
 import sys
 import time
 
-# RESULTSDIR=$HOME/relevant_directory
-results_dir = "./"  # Insert later
+results_dir = None  # Initialize as None
 
 
-def performance_metrics(total_xacts, total_xact_time, latencies):
+def set_results_dir(dir_path):
+    global results_dir
+    results_dir = dir_path
+
+
+def performance_metrics(total_xacts, total_xact_time, latencies, results_dir):
     total_xact_time = round(total_xact_time, 2)
     throughput = round(total_xacts / total_xact_time, 2)
     avg_latency = round(statistics.mean(latencies), 2)
     median_latency = round(statistics.median(latencies), 2)
+    set_results_dir(results_dir)
     percentile_95_latency = round(statistics.quantiles(latencies, n=100)[94] * 1000, 2)
     percentile_99_latency = round(statistics.quantiles(latencies, n=100)[98] * 1000, 2)
 

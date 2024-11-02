@@ -5,7 +5,8 @@ HOSTNAME=$(hostname)
 REMAINDER=$(($SLURM_PROCID % 5))
 
 INSTALLDIR=$HOME/pgsql
-SCRIPTSDIR="$HOME/project_files/scripts"
+SCRIPTSDIR=$HOME/project_files/scripts
+OUTPUTDIR=$HOME/output
 LOGDIR=$HOME/tyx021
 LOGFILE=${LOGDIR}/log.txt
 LOCKFILE=/tmp/citus-init.lock  # Lock file for synchronization
@@ -14,7 +15,7 @@ DATA_FOLDER=$HOME/tyx021/data_files
 NODELIST=$(scontrol show hostname $SLURM_NODELIST) # Gets a list of hostnames
 NODE_ARRAY=($NODELIST) # Convert the list into an array
 
-SIGNAL_DIR="../$SLURM_JOB_ID"
+SIGNAL_DIR=$HOME/signal/$SLURM_JOB_ID
 BARRIER_DIR="${SIGNAL_DIR}/barrier"
 TABLE_SETUP_DONE_SIGNAL_FILE="${SIGNAL_DIR}/table_setup_done"
 
@@ -52,10 +53,10 @@ if [ ! -d "${BARRIER_DIR}" ]; then
 fi
 
 
+
 if [ ${REMAINDER} -eq 0 ]; then
     rm -rf /tmp/.s.PGSQL.5098.lock
     bash ${SCRIPTSDIR}/init-citus-db.sh
-
     # worker nodes and coordinator node will start & create the database
     ${INSTALLDIR}/bin/pg_ctl -D $PGDATA -l ${LOGFILE} -o "-p ${PGPORT}" start
     ${INSTALLDIR}/bin/createdb -U $PGUSER $PGDATABASE
@@ -64,12 +65,20 @@ if [ ${REMAINDER} -eq 0 ]; then
     if [ "${HOSTNAME}" = "$coordinator_node" ]; then
         echo "Process $SLURM_PROCID on ${HOSTNAME} will be executing as the Citus coordinator node"
         ${INSTALLDIR}/bin/psql -U $PGUSER -d $PGDATABASE -c "SELECT citus_set_coordinator_host('${HOSTNAME}', $PGPORT);"
+        # ${INSTALLDIR}/bin/psql -U $PGUSER -d $PGDATABASE -c "SET citus.enable_repartition_joins = true;"
+        # ${INSTALLDIR}/bin/psql -U $PGUSER -d $PGDATABASE -c "SET citus.enable_repartition_joins = 'true';"
+
+        ${INSTALLDIR}/bin/psql -U $PGUSER -d $PGDATABASE -c "ALTER DATABASE $PGDATABASE SET citus.enable_repartition_joins = 'true';"
         # set up the worker nodes
         sleep 30 # wait for the worker nodes to start
         for ((i=1; i<${SLURM_NNODES}; i++)); do
             ${INSTALLDIR}/bin/psql -U $PGUSER -d $PGDATABASE -c "SELECT * from citus_add_node('${NODE_ARRAY[$i]}', $PGPORT);"
         done
         ${INSTALLDIR}/bin/psql -U $PGUSER -d $PGDATABASE -c "SELECT * from citus_get_active_worker_nodes();"
+
+        # Remove and recreate the output folder
+        rm -rf ${OUTPUTDIR}
+        mkdir -p ${OUTPUTDIR}
 
         bash $HOME/tyx021/init-data.sh
         signal_table_setup_done
@@ -99,7 +108,7 @@ else
 
     # remove this when ready to run all txn
     if [ ${task_counter} -eq 0 ]; then
-        python3 test-run/main.py ${task_counter} < ./test-run/test.txt
+        python3 test-run/main.py ${task_counter} ${OUTPUTDIR} < ./test-run/test.txt
     fi
 fi
 

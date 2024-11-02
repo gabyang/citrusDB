@@ -1,11 +1,8 @@
 import csv
 import time
 
-# RESULTSDIR=$HOME/relevant_directory
-results_dir = "./"  # Insert later
 
-
-def query_statistics(cursor):
+def query_statistics(cursor, results_dir):
     measurements = [
         "SELECT SUM(W_YTD) FROM Warehouse",
         "SELECT SUM(D_YTD), SUM(D_NEXT_O_ID) FROM District",

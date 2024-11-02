@@ -7,6 +7,7 @@ import metrics
 from transactions import Transactions
 
 client_number = sys.argv[1]  # Get client number from command line
+results_dir = sys.argv[2]  # Get output directory from command line
 
 txn = Transactions("project", "cs4224b", 5098)
 # txn = Transactions()
@@ -82,10 +83,12 @@ for line in sys.stdin:
     process_transaction(line.split(","))
 
 print("Measuring database statistics")
-query_statistics.query_statistics(txn.cursor)
+query_statistics.query_statistics(txn.cursor, results_dir)
 
 print("Measuring performance metrics")
-perf_metrics = metrics.performance_metrics(total_num_exec_xacts, total_exec_time, latencies)
+perf_metrics = metrics.performance_metrics(
+    total_num_exec_xacts, total_exec_time, latencies, results_dir
+)
 
 print(f"Client {client_number}: writing performance metrics")
 metrics.write_metrics_csv(client_number, perf_metrics)
