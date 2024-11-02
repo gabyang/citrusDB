@@ -6,6 +6,8 @@ REMAINDER=$(($SLURM_PROCID % 5))
 
 INSTALLDIR=$HOME/pgsql
 SCRIPTSDIR=$HOME/project_files/scripts
+XACTDIR=$HOME/project_files/xact_files
+
 OUTPUTDIR=$HOME/output
 LOGDIR=$HOME/tyx021
 LOGFILE=${LOGDIR}/log.txt
@@ -16,7 +18,6 @@ NODELIST=$(scontrol show hostname $SLURM_NODELIST) # Gets a list of hostnames
 NODE_ARRAY=($NODELIST) # Convert the list into an array
 
 SIGNAL_DIR=$HOME/signal/$SLURM_JOB_ID
-BARRIER_DIR="${SIGNAL_DIR}/barrier"
 TABLE_SETUP_DONE_SIGNAL_FILE="${SIGNAL_DIR}/table_setup_done"
 
 signal_table_setup_done() {
@@ -34,7 +35,7 @@ signal_barrier() {
 }
 
 wait_barrier() {
-    while [ $(ls ${BARRIER_DIR} | wc -l) -lt ${SLURM_NNODES} ]; do
+    while [ $(ls ${SIGNAL_DIR} | wc -l) -lt ${SLURM_NNODES} ]; do
         sleep 5
     done
 }
@@ -46,10 +47,6 @@ fi
 
 if [ ! -d "${SIGNAL_DIR}" ]; then
     mkdir -p ${SIGNAL_DIR}
-fi
-
-if [ ! -d "${BARRIER_DIR}" ]; then
-    mkdir -p ${BARRIER_DIR}
 fi
 
 
@@ -99,15 +96,14 @@ else
     done
 
     # Assign task file based on task_counter and execute respective txn
-    task_file="${task_counter}.txt"
-    # Uncomment following lines when ready to run all txn
-    # echo "Process $SLURM_PROCID is working on txn ${task_file}"
-    # python3 test-run/main.py ${task_counter} < ${task_file}
+    task_file="${XACTDIR}/${task_counter}.txt"
+    echo "Process $SLURM_PROCID is working on txn ${task_file}"
+    python3 test-run/main.py ${task_counter} ${OUTPUTDIR} < ${task_file}
+    echo "Process $SLURM_PROCID has completed txn ${task_file}"
 
     # remove this when ready to run all txn
-    if [ ${task_counter} -eq 0 ]; then
-        python3 test-run/main.py ${task_counter} ${OUTPUTDIR} < ./test-run/test.txt
-    fi
+    # if [ ${task_counter} -eq 0 ]; then
+    # fi
 fi
 
 # To prevent the script from exiting before all processes are done
