@@ -9,67 +9,39 @@ CREATE OR REPLACE PROCEDURE gettop10customers()
 LANGUAGE plpgsql
 AS \$\$
 DECLARE
-    r RECORD;
+    customer_record RECORD;
+    warehouse_name TEXT;
+    dist_name TEXT;
 BEGIN
-    -- Create temporary tables to hold intermediate data
-    CREATE TEMP TABLE temp_customer_data AS
-    SELECT
-        C_FIRST,
-        C_MIDDLE,
-        C_LAST,
-        C_BALANCE,
-        C_W_ID,
-        C_D_ID
-    FROM
-        "customer_2-7";
-
-    CREATE TEMP TABLE temp_warehouse_data AS
-    SELECT
-        W_ID,
-        W_NAME
-    FROM
-        Warehouse;
-
-    CREATE TEMP TABLE temp_district_data AS
-    SELECT
-        D_W_ID,
-        D_ID,
-        D_NAME
-    FROM
-        District;
-
-    -- Loop through the top 10 customers ranked by outstanding balance
-    FOR r IN
-        SELECT
-            cd.C_FIRST,
-            cd.C_MIDDLE,
-            cd.C_LAST,
-            cd.C_BALANCE,
-            wd.W_NAME,
-            dd.D_NAME
-        FROM
-            temp_customer_data cd,
-            temp_warehouse_data wd,
-            temp_district_data dd
-        WHERE
-            cd.C_W_ID = wd.W_ID
-            AND cd.C_W_ID = dd.D_W_ID
-            AND cd.C_D_ID = dd.D_ID
-        ORDER BY
-            cd.C_BALANCE DESC
+    FOR customer_record IN
+        SELECT 
+            C_FIRST, C_MIDDLE, C_LAST, C_BALANCE, 
+            C_W_ID, C_D_ID
+        FROM "customer_2-7"
+        ORDER BY C_BALANCE DESC 
         LIMIT 10
     LOOP
-        -- Raise notice to display each result
-        RAISE NOTICE 'Customer: % % %, Balance: %, Warehouse: %, District: %',
-            r.C_FIRST,
-            r.C_MIDDLE,
-            r.C_LAST,
-            r.C_BALANCE,
-            r.W_NAME,
-            r.D_NAME;
-    END LOOP;
+        -- Fetch the warehouse name for the current customer
+        SELECT W_NAME INTO warehouse_name
+        FROM warehouse
+        WHERE W_ID = customer_record.C_W_ID;
 
+        -- Fetch the district name for the current customer
+        SELECT D_NAME INTO dist_name
+        FROM district
+        WHERE D_ID = customer_record.C_D_ID AND D_W_ID = customer_record.C_W_ID;
+
+        -- Output customer and associated warehouse and district names
+        RAISE NOTICE 'Customer: First=%, Middle=%, Last=%, Balance=%',
+                     customer_record.C_FIRST, 
+                     customer_record.C_MIDDLE, 
+                     customer_record.C_LAST, 
+                     customer_record.C_BALANCE;
+        RAISE NOTICE 'Warehouse: %', warehouse_name;
+        RAISE NOTICE 'District: %', dist_name;
+    END LOOP;
 END;
+
 \$\$;
 EOF
 )

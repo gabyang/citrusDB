@@ -27,6 +27,8 @@ BEGIN
       AND C_D_ID = inputC_D_ID
       AND C_ID = inputC_ID;
 
+    RAISE NOTICE 'Customer Identifier: (%, %, %)', inputC_W_ID, inputC_D_ID, inputC_ID;
+
     -- Step 2: Get the last order for the given customer C
     SELECT O_ID INTO lastOrderID
     FROM "order"
@@ -35,6 +37,7 @@ BEGIN
       AND O_C_ID = inputC_ID
     ORDER BY O_ENTRY_D DESC
     LIMIT 1;
+    RAISE NOTICE 'lastOrderID: %', lastOrderID;
 
     -- Step 3: Find all customers C' in the same state as input customer and loop over them
     FOR custRecord IN
@@ -51,7 +54,10 @@ BEGIN
           AND O_C_ID = custRecord.customerID
         ORDER BY O_ENTRY_D DESC
         LIMIT 1;
-
+        -- RAISE NOTICE 'O_ID: %', lastOrderID_C;
+        -- RAISE NOTICE 'custRecord.warehouseID: %', custRecord.warehouseID;
+        -- RAISE NOTICE 'custRecord.districtID: %', custRecord.districtID;
+        -- RAISE NOTICE 'custRecord.customerID: %', custRecord.customerID;
 
         -- Step 5: Check for matching items (at least two distinct matching items)
         SELECT COUNT(*) INTO itemCount

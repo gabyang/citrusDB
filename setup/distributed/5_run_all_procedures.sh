@@ -8,3 +8,4 @@
 ./procedure/5_6_txn.sh
 ./procedure/5_7_txn.sh
 ./procedure/5_8_txn.sh
+./procedure/5_8_2_txn.sh
