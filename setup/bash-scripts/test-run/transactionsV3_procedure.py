@@ -87,6 +87,7 @@ class Transactions:
             for notice in self.cursor.connection.notices:
                 print(notice.strip())
             self.cursor.execute("COMMIT")
+            self.cursor.connection.notices.clear()
 
 
         except (Exception, psycopg2.DatabaseError) as error:
@@ -198,16 +199,15 @@ class Transactions:
             num_last_orders (int): Number of last orders to be examined L
         """
         try:
-            self.cursor.execute("BEGIN")
-            # Step 1: Get customer name and balance
+            # self.cursor.execute("BEGIN")
             self.cursor.execute("""
                 call report_low_stock_items(%s,%s,%s,%s);
             """, (w_id, d_id, threshold, num_last_orders))
             # Capture any notices that were raised
             for notice in self.cursor.connection.notices:
                 print(notice.strip())
-            self.cursor.execute("COMMIT")
-
+            # self.cursor.execute("COMMIT")
+            self.cursor.connection.notices.clear()
         except (Exception, psycopg2.DatabaseError) as error:
             print(f"An error occurred: {error}")
             self.cursor.execute("ROLLBACK")
