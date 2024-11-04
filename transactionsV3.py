@@ -19,12 +19,12 @@ class Transactions:
         username = os.getenv("DATABASE_USERNAME")
         port = int(os.getenv("DATABASE_PORT", "5432"))
         password = os.getenv("DATABASE_PASSWORD")
-
+ 
         try:
             self.conn = psycopg2.connect(
                 host="localhost", database=database, user=username, port=port, password=password
             )
-            # self.conn.autocommit = True
+            self.conn.autocommit = True
             self.cursor = self.conn.cursor()
             print("Cursor created successfully")
 
@@ -76,6 +76,7 @@ class Transactions:
             quantities (List[int]): List of quantities for each item
         """
         try:
+            self.cursor.execute("BEGIN")
             orderline_inputs = []
             for i in range(num_items):
                 orderline_inputs.append((
@@ -241,6 +242,7 @@ class Transactions:
                 output.extend([ol[0], ol[1], ol[2], ol[3], f"{ol[4]:.2f}", ol[5]])
 
             # Join the array and output to the file
+            self.cursor.execute("COMMIT")
             output = str(output)
             print(output)
 
@@ -268,6 +270,7 @@ class Transactions:
             - Payment amount
         """
         try:
+            self.cursor.execute("BEGIN")
             # Step 1: Update the warehouse by incrementing W_YTD by PAYMENT
 
             self.cursor.execute(
@@ -369,7 +372,7 @@ class Transactions:
                            district_addr[0], district_addr[1], district_addr[2], district_addr[3], district_addr[4]])
             output.extend([f"{payment:.2f}"])
 
-            # Output the final formatted string
+            self.cursor.execute("COMMIT")
             output = str(output)
             print(output)
             return None
@@ -389,7 +392,7 @@ class Transactions:
             carrier_id (int): Carrier ID
         """
         try:
-            # self.cursor.execute("BEGIN")
+            self.cursor.execute("BEGIN")
 
             # Process steps for district numbers 1 through 10
             for district_no in range(1, 11):
@@ -452,6 +455,8 @@ class Transactions:
                     SET c_delivery_cnt = c_delivery_cnt + 1 
                     WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s
                     """, (w_id, district_no, customer_id))
+            
+            self.cursor.execute("COMMIT")
 
         except (Exception, psycopg2.DatabaseError) as error:
             print(f"An error occurred: {error}")
@@ -475,7 +480,7 @@ class Transactions:
             - Item details in the last order (OL_I_ID, OL_SUPPLY_W_ID, OL_QUANTITY, OL_AMOUNT, OL_DELIVERY_D)
         """
         try:
-            # self.cursor.execute("BEGIN")
+            self.cursor.execute("BEGIN")
 
             self.cursor.execute("""
                 SELECT c_first, c_middle, c_last, c_balance
@@ -523,7 +528,7 @@ class Transactions:
                     f"{item[3]:.2f}", item[4]
                 ])
 
-            # Convert to string and print
+            self.cursor.execute("COMMIT")
             output = str(output)
             print(output)
             return None
@@ -546,7 +551,7 @@ class Transactions:
             num_last_orders (int): Number of last orders to be examined L
         """
         try:
-            # self.cursor.execute("BEGIN")
+            self.cursor.execute("BEGIN")
 
             # Step 1: Get the next available order number for the district
             self.cursor.execute("SELECT d_next_o_id FROM \"district_2-5\" WHERE d_w_id = %s AND d_id = %s", (w_id, d_id))
@@ -569,12 +574,10 @@ class Transactions:
             self.cursor.execute(query, (w_id, item_ids, threshold))
             low_stock_count = self.cursor.fetchone()[0]
 
-            # Output the total number of items in S where the stock quantity is below the threshold
+            self.cursor.execute("COMMIT")
             output = [low_stock_count]
             output = str(output)
             print(output)
-
-            # self.cursor.execute("COMMIT")
 
             return None
 
@@ -604,7 +607,7 @@ class Transactions:
                 e. Number of orders x.num_orders
         """
         try:
-            # self.cursor.execute("BEGIN")
+            self.cursor.execute("BEGIN")
 
             # Step 1: Get the next available order number for the district
             self.cursor.execute("""
@@ -663,7 +666,6 @@ class Transactions:
                     'num_orders': item[2]
                 })
 
-            # self.cursor.execute("COMMIT")
             # Output the popular items
             output = [
                 w_id, d_id, l
@@ -676,7 +678,7 @@ class Transactions:
                     item['num_orders']
                 ])
 
-            # Convert list to string and print
+            self.cursor.execute("COMMIT")
             output = str(output)
             print(output)
             return None
@@ -699,7 +701,7 @@ class Transactions:
             d. District name (D_NAME)
         """
         try:
-            # self.cursor.execute("BEGIN")
+            self.cursor.execute("BEGIN")
 
             # Step 1: Get the top 10 customers by balance in non-ascending order
             self.cursor.execute("""
@@ -739,8 +741,6 @@ class Transactions:
             """
             self.cursor.execute(district_query, (c_d_ids, c_w_ids, c_w_ids))
             district_names = [row[0] for row in self.cursor.fetchall()]
-            
-            # self.cursor.execute("COMMIT")
 
             # Step 4: Output the details of each top customer
             output = []
@@ -754,7 +754,7 @@ class Transactions:
                     district_names[i],
                 ])
 
-            # Convert list to string and print
+            self.cursor.execute("COMMIT")
             output = str(output)
             print(output)
 
@@ -782,7 +782,7 @@ class Transactions:
             and for each customer, return the identifiers (C_W_ID, C_D_ID, C_ID) of each related customer.
         """
         try:
-            # self.cursor.execute("BEGIN")
+            self.cursor.execute("BEGIN")
 
             # Step 1: Get the state of the given customer
             self.cursor.execute("""
@@ -859,10 +859,9 @@ class Transactions:
                     related_customer[2]   # Related Customer C_ID
                 ])
 
-            # Convert list to string and print
+            self.cursor.execute("COMMIT")
             output = str(output)
             print(output)
-
             return None
 
         except (Exception, psycopg2.DatabaseError) as error:
