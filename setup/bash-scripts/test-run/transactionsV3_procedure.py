@@ -297,11 +297,12 @@ class Transactions:
             self.cursor.execute("BEGIN")
             # Step 1: Get customer name and balance
             self.cursor.execute("""
-                call find_related_customers(%s,%s,%s);
+                call find_related_customers_no_join(%s,%s,%s);
             """, (c_w_id, c_d_id, c_id))
             # Capture any notices that were raised
             for notice in self.cursor.connection.notices:
                 print(notice.strip())
+            self.cursor.connection.notices.clear()
             self.cursor.execute("COMMIT")
 
         except (Exception, psycopg2.DatabaseError) as error:

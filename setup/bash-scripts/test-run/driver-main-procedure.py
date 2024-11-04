@@ -70,7 +70,6 @@ def process_transaction(params):
         result = txn_func(warehouse_id,carrier_id)
         print(f"Processed {txn_type}: {result}")
     elif txn_type == 'T':
-        print('T')
         result = txn_func()
         print(f"Processed {txn_type}: {result}")
     elif txn_type == 'S': 
@@ -123,12 +122,10 @@ def process_transaction(params):
     total_num_exec_xacts += 1
     total_exec_time += latency
 for line in sys.stdin:
-
     # Read and parse transaction from stdin
     values = line.split(',')
     # Read and parse transaction from stdin
     if values[0].strip() in {'N', 'P', 'D', 'O', 'S', 'I', 'T', 'R'}:
-        
         process_transaction(line)
 
 print("Measuring database statistics")

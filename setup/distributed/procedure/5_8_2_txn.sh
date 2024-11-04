@@ -6,108 +6,80 @@ DROP_PROCEDURE_SQL="DROP PROCEDURE IF EXISTS find_related_customers_no_join(INT,
 # SQL to create the new function
 CREATE_PROCEDURE_SQL=$(cat <<EOF
 CREATE OR REPLACE PROCEDURE find_related_customers_no_join(
-    inputC_W_ID INT, 
-    inputC_D_ID INT, 
-    inputC_ID INT
+    IN input_c_w_id INT,           -- Warehouse ID of the given customer
+    IN input_c_d_id INT,           -- District ID of the given customer
+    IN input_c_id INT              -- Customer ID of the given customer
 )
 LANGUAGE plpgsql
-AS
-\$\$
+AS \$\$
 DECLARE
-    state_x TEXT;
-    last_order_x_id INT;
-    items_x TEXT[] := '{}';  -- Array to hold items for customer X
-    related_customers TEXT := '';  -- To store related customer IDs
-    custRecord RECORD;
-
-    current_customer_id INT;
-    current_last_order_id INT;
-    items_y TEXT[] := '{}';  -- Array to hold items for the current customer
-    common_items_count INT;
-    item TEXT;
+    customer_state TEXT;
+    customer_last_order_id INT;
+    customer_item_ids INT[];
+    related_customers RECORD;
+    output TEXT := '';  -- To accumulate output
 BEGIN
-    RAISE NOTICE 'Customer Identifier: (%, %, %)', inputC_W_ID, inputC_D_ID, inputC_ID;
-
     -- Step 1: Get the state of the given customer
-    SELECT C_STATE INTO state_x 
-    FROM "customer_2-8"     
-    WHERE C_W_ID = inputC_W_ID
-      AND C_D_ID = inputC_D_ID
-      AND C_ID = inputC_ID;
-
-    RAISE NOTICE 'INPUT CUSTOMER STATE: %', state_x;
+    SELECT c_state 
+    INTO customer_state 
+    FROM "customer_2-8" 
+    WHERE c_w_id = input_c_w_id AND c_d_id = input_c_d_id AND c_id = input_c_id;
 
     -- Step 2: Get the last order ID for the given customer
-    SELECT O_ID INTO last_order_x_id
-    FROM "order"
-    WHERE O_W_ID = inputC_W_ID
-      AND O_D_ID = inputC_D_ID
-      AND O_C_ID = inputC_ID
-      ORDER BY O_ENTRY_D DESC
-    LIMIT 1;
-    RAISE NOTICE 'last_order_x_id: %', last_order_x_id;
+    SELECT o_id 
+    INTO customer_last_order_id 
+    FROM "order" 
+    WHERE o_w_id = input_c_w_id AND o_d_id = input_c_d_id AND o_c_id = input_c_id 
+    ORDER BY o_entry_d DESC LIMIT 1;
 
-    -- Step 3: Retrieve items for the last order of the given customer
-    FOR item IN
-        SELECT OL_I_ID
-        FROM "order-line"
-        WHERE OL_O_ID = last_order_x_id
-            AND OL_W_ID = inputC_W_ID
-            AND OL_D_ID = inputC_D_ID
+    -- Step 2.1: Get item IDs for the last order
+    SELECT ARRAY_AGG(DISTINCT ol_i_id)
+    INTO customer_item_ids
+    FROM "order-line"
+    WHERE ol_w_id = input_c_w_id AND ol_d_id = input_c_d_id AND ol_o_id = customer_last_order_id;
+
+    -- Check if the customer has items in the last order
+    IF customer_item_ids IS NULL OR array_length(customer_item_ids, 1) = 0 THEN
+        RAISE NOTICE 'No items in the customer''s last order.';
+        RETURN;
+    END IF;
+    RAISE NOTICE 'Customer: (%, %, %)', input_c_w_id, input_c_d_id, input_c_id;
+
+    -- Step 3: Find related customers
+    FOR related_customers IN
+        WITH c2_customers AS (
+            SELECT c_w_id, c_d_id, c_id
+            FROM "customer_2-8"
+            WHERE c_state = customer_state
+            AND NOT (c_w_id = input_c_w_id AND c_d_id = input_c_d_id AND c_id = input_c_id)
+        ),
+        c2_last_orders AS (
+            SELECT o.o_w_id AS c_w_id, o.o_d_id AS c_d_id, o.o_c_id AS c_id, MAX(o.o_id) AS o_id
+            FROM "order" o
+            JOIN c2_customers c2 ON o.o_w_id = c2.c_w_id AND o.o_d_id = c2.c_d_id AND o.o_c_id = c2.c_id
+            GROUP BY o.o_w_id, o.o_d_id, o.o_c_id
+        ),
+        c2_items AS (
+            SELECT c2.c_w_id, c2.c_d_id, c2.c_id, ol.ol_i_id
+            FROM c2_last_orders c2
+            JOIN "order-line" ol 
+            ON ol.ol_w_id = c2.c_w_id AND ol.ol_d_id = c2.c_d_id AND ol.ol_o_id = c2.o_id
+            WHERE ol.ol_i_id = ANY(customer_item_ids)
+        )
+        SELECT c_w_id, c_d_id, c_id
+        FROM (
+            SELECT c2_items.c_w_id, c2_items.c_d_id, c2_items.c_id, COUNT(DISTINCT c2_items.ol_i_id) AS common_items
+            FROM c2_items
+            GROUP BY c2_items.c_w_id, c2_items.c_d_id, c2_items.c_id
+        ) sub
+        WHERE sub.common_items >= 2
+        ORDER BY c_w_id, c_d_id, c_id
     LOOP
-        items_x := array_append(items_x, item);
-        RAISE NOTICE 'item %', item;
+        -- Append to output for each related customer
+       RAISE NOTICE 'Related Customer: (C_W_ID: %, C_D_ID: %, C_ID: %)', related_customers.c_w_id, related_customers.c_d_id, related_customers.c_id;
     END LOOP;
-    
-    -- Step 4: Loop over other customers in the same state
-    FOR custRecord IN
-        SELECT C_ID AS customerID, C_W_ID AS warehouseID, C_D_ID AS districtID
-        FROM "customer_2-8"
-        WHERE C_STATE = state_x
-          AND (C_W_ID != inputC_W_ID OR C_D_ID != inputC_D_ID OR C_ID != inputC_ID)  -- Exclude the original customer
-    LOOP
-        IF custRecord.customerID = 316 THEN
-            RAISE NOTICE 'Checking customer: %', custRecord.customerID;
-        END IF;
-        -- Step 5: Get the last order ID for the current customer
-        SELECT O_ID INTO current_last_order_id
-        FROM "order"
-        WHERE O_W_ID = custRecord.warehouseID
-          AND O_D_ID = custRecord.districtID
-          AND O_C_ID = custRecord.customerID
-        ORDER BY O_ENTRY_D DESC
-        LIMIT 1;
 
-        IF custRecord.customerID = 316 THEN
-            RAISE NOTICE 'current_last_order_id %', current_last_order_id;
-        END IF;
 
-        -- Step 6: Retrieve items for the last order of the current customer
-        items_y := '{}';  -- Reset the items array
-        FOR item IN
-            SELECT OL_I_ID
-            FROM "order-line"
-            WHERE OL_O_ID = current_last_order_id
-        LOOP
-            items_y := array_append(items_y, item);
-            IF custRecord.customerID = 316 THEN
-                RAISE NOTICE 'item %', item;
-            END IF;
-        END LOOP;
-        -- Step 7: Count the number of common items
-        common_items_count := 0;
-
-        FOR i IN 0..array_length(items_y,1) LOOP
-            IF items_x[i] = ANY (items_y) THEN
-                common_items_count := common_items_count + 1;
-            END IF;
-        END LOOP;
-
-        -- Step 8: Check if there are at least two common items
-        IF common_items_count >= 2 THEN
-            RAISE NOTICE 'Similar Customer ID: %, Warehouse ID: %, District ID: %', custRecord.customerID, custRecord.warehouseID, custRecord.districtID;
-        END IF;
-    END LOOP;
 END;
 \$\$;
 
