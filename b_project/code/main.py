@@ -4,7 +4,6 @@ import time
 import query_statistics
 import throughput
 
-# from transactions import Transactions
 from transactions import Transactions
 
 import metrics
