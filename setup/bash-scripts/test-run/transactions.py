@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import psycopg2
 from dotenv import load_dotenv
 from psycopg2 import sql
+from psycopg2.extras import execute_values
 
 
 class Transactions:
@@ -16,10 +17,15 @@ class Transactions:
         database = os.getenv("DATABASE_NAME")
         username = os.getenv("DATABASE_USERNAME")
         port = int(os.getenv("DATABASE_PORT", "5432"))
+        password = os.getenv("DATABASE_PASSWORD")
+
         try:
-            self.conn = psycopg2.connect(host=host, database=database, user=username, port=port)
-            print("Successfully connected to the PostgreSQL database")
+            self.conn = psycopg2.connect(
+                host=host, database=database, user=username, port=port, password=password
+            )
+            # self.conn.autocommit = True
             self.cursor = self.conn.cursor()
+            print("Cursor created successfully")
 
         except (Exception, psycopg2.DatabaseError) as error:
             print(f"Error while connecting to PostgreSQL: {error}")
@@ -79,13 +85,15 @@ class Transactions:
             # step 1 and step 2
             next_order_id = None
             self.cursor.execute(
-                "SELECT D_NEXT_O_ID FROM district WHERE D_ID = %s AND D_W_ID = %s", (d_id, w_id)
-            )
-            next_order_id = self.cursor.fetchone()[0] + 1
-            self.cursor.execute(
-                "UPDATE district SET D_NEXT_O_ID = D_NEXT_O_ID + 1 WHERE D_ID = %s AND D_W_ID = %s",
+                """
+                UPDATE "district_2-5"
+                SET D_NEXT_O_ID = D_NEXT_O_ID + 1
+                WHERE D_ID = %s AND D_W_ID = %s
+                RETURNING D_NEXT_O_ID
+            """,
                 (d_id, w_id),
             )
+            next_order_id = self.cursor.fetchone()[0]
 
             # step 3
             entry_time = datetime.now(timezone.utc)
@@ -94,58 +102,90 @@ class Transactions:
                 (next_order_id, d_id, w_id, c_id, entry_time, num_items, is_all_local),
             )
 
-            # Update stock and calculate total amount
-            total_amount = 0
-            orderline_outputs = []
-
             # retrieve item prices
-            self.cursor.execute(
-                "SELECT I_PRICE, I_NAME FROM item WHERE I_ID = ANY(%s::int[])", (item_ids,)
-            )
+            item_query = """
+                WITH item_ids AS (
+                    SELECT unnest(%s::int[]) AS I_ID, generate_subscripts(%s::int[], 1) AS ord
+                )
+                SELECT i.I_PRICE, i.I_NAME
+                FROM item i
+                JOIN item_ids ii ON i.I_ID = ii.I_ID
+                ORDER BY ii.ord;
+            """
+            self.cursor.execute(item_query, (item_ids, item_ids))
             result = self.cursor.fetchall()
             item_prices = [round(float(x[0]), 2) for x in result]
             item_names = [x[1] for x in result]
 
             # retrieve distance information
             stock_dist_id = f"S_DIST_0{d_id}" if d_id < 10 else f"S_DIST_{d_id}"
-            query = f"SELECT {stock_dist_id} FROM stock WHERE S_I_ID = ANY(%s) AND S_W_ID = {w_id}"
-            self.cursor.execute(query, (item_ids,))
+            stock_query = f"""
+                WITH item_ids AS (
+                    SELECT unnest(%s::int[]) AS S_I_ID, generate_subscripts(%s::int[], 1) AS ord
+                )
+                SELECT s.{stock_dist_id}
+                FROM stock s
+                JOIN item_ids ii ON s.S_I_ID = ii.S_I_ID
+                WHERE s.S_W_ID = {w_id}
+                ORDER BY ii.ord;
+            """
+
+            self.cursor.execute(stock_query, (item_ids, item_ids))
             result = self.cursor.fetchall()
             ol_dist = [x[0] for x in result]
 
-            # TODO: Optimize the for loop below to update ALL if that is possible.
+            # intialise variables
+            stock_items = [
+                (item_id, supplier_warehouses[idx]) for idx, item_id in enumerate(item_ids)
+            ]
+
+            stock_data_query = """
+                SELECT s.S_YTD, s.S_ORDER_CNT, s.S_REMOTE_CNT
+                FROM unnest(%s::int[], %s::int[]) AS input(S_I_ID, S_W_ID)
+                JOIN stock s ON s.S_I_ID = input.S_I_ID AND s.S_W_ID = input.S_W_ID
+                ORDER BY array_position(%s::int[], input.S_I_ID)
+            """
+            self.cursor.execute(stock_data_query, (item_ids, supplier_warehouses, item_ids))
+            stock_data = self.cursor.fetchall()
+
+            stock_quantity_query = """
+                SELECT s.S_QUANTITY
+                FROM unnest(%s::int[], %s::int[]) AS input(S_I_ID, S_W_ID)
+                JOIN "stock_2-5" s ON s.S_I_ID = input.S_I_ID AND s.S_W_ID = input.S_W_ID
+                ORDER BY array_position(%s::int[], input.S_I_ID)
+            """
+            self.cursor.execute(stock_quantity_query, (item_ids, supplier_warehouses, item_ids))
+            stock_quantities = self.cursor.fetchall()
+
+            total_amount = 0
+            orderline_outputs = []
+            batch_stock_update_data = []
+            batch_stock_2_5_update_data = []
+            batch_ol_update_data = []
+
             for idx, ol in enumerate(orderline_inputs):
                 ol_item_id = ol[0]
                 ol_warehouse = ol[1]
                 ol_quantity = ol[2]
-                self.cursor.execute(
-                    "SELECT S_QUANTITY, S_YTD, S_ORDER_CNT, S_REMOTE_CNT FROM stock WHERE S_I_ID = %s AND S_W_ID = %s",
-                    (ol_item_id, ol_warehouse),
-                )
 
-                quantity, ytd, order_count, remote_count = self.cursor.fetchone()
+                item_price = item_prices[idx]
+                item_name = item_names[idx]
+                ytd, order_count, remote_count = stock_data[idx]
+                stock_quantity = stock_quantities[idx][0]
 
-                next_quantity = quantity + ol_quantity
+                next_quantity = stock_quantity + ol_quantity
                 next_quantity = next_quantity + 100 if next_quantity < 10 else next_quantity
                 next_ytd = ytd + ol_quantity
                 next_order_count = order_count + 1
                 next_remote_count = remote_count + (1 if ol_warehouse != w_id else 0)
 
-                self.cursor.execute(
-                    "UPDATE stock SET S_QUANTITY = %s, S_YTD = %s, S_ORDER_CNT = %s, S_REMOTE_CNT = %s WHERE s_w_id = %s AND s_i_id = %s",
-                    (
-                        next_quantity,
-                        next_ytd,
-                        next_order_count,
-                        next_remote_count,
-                        ol_warehouse,
-                        ol_item_id,
-                    ),
+                batch_stock_update_data.append(
+                    (next_ytd, next_order_count, next_remote_count, ol_warehouse, ol_item_id)
                 )
+                batch_stock_2_5_update_data.append((next_quantity, ol_warehouse, ol_item_id))
 
                 item_amount = item_prices[idx] * ol_quantity
                 total_amount += item_amount
-
                 orderline_outputs.append(
                     [
                         ol_item_id,
@@ -157,9 +197,7 @@ class Transactions:
                     ]
                 )
 
-                # step 5
-                self.cursor.execute(
-                    'INSERT INTO "order-line"(ol_w_id, ol_d_id, ol_o_id, ol_number, ol_i_id, ol_amount, ol_supply_w_id, ol_quantity, ol_dist_info, ol_delivery_d) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NULL)',
+                batch_ol_update_data.append(
                     (
                         w_id,
                         d_id,
@@ -170,8 +208,46 @@ class Transactions:
                         ol_warehouse,
                         ol_quantity,
                         ol_dist[idx],
-                    ),
+                        None,
+                    )
                 )
+
+            execute_values(
+                self.cursor,
+                """
+                UPDATE stock
+                SET 
+                    S_YTD = data.S_YTD,
+                    S_ORDER_CNT = data.S_ORDER_CNT,
+                    S_REMOTE_CNT = data.S_REMOTE_CNT
+                FROM (VALUES %s) AS data(S_YTD, S_ORDER_CNT, S_REMOTE_CNT, S_W_ID, S_I_ID)
+                WHERE stock.S_W_ID = data.S_W_ID AND stock.S_I_ID = data.S_I_ID;
+            """,
+                batch_stock_update_data,
+            )
+
+            execute_values(
+                self.cursor,
+                """
+                UPDATE "stock_2-5"
+                SET S_QUANTITY = data.S_QUANTITY
+                FROM (VALUES %s) AS data(S_QUANTITY, S_W_ID, S_I_ID)
+                WHERE "stock_2-5".S_W_ID = data.S_W_ID AND "stock_2-5".S_I_ID = data.S_I_ID;
+            """,
+                batch_stock_2_5_update_data,
+            )
+
+            execute_values(
+                self.cursor,
+                """
+                INSERT INTO "order-line" (
+                    ol_w_id, ol_d_id, ol_o_id, ol_number, ol_i_id,
+                    ol_amount, ol_supply_w_id, ol_quantity, ol_dist_info, ol_delivery_d
+                )
+                VALUES %s
+            """,
+                batch_ol_update_data,
+            )
 
             self.cursor.execute(
                 "SELECT d_tax FROM district WHERE D_ID = %s AND D_W_ID = %s", (d_id, w_id)
@@ -182,10 +258,15 @@ class Transactions:
             w_tax = round(float(self.cursor.fetchone()[0]), 4)
 
             self.cursor.execute(
-                "SELECT c_discount, c_last, c_credit FROM customer WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s",
+                "SELECT c_discount, c_credit FROM customer WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s",
                 (w_id, d_id, c_id),
             )
-            c_discount, c_last, c_credit = self.cursor.fetchone()
+            c_discount, c_credit = self.cursor.fetchone()
+            self.cursor.execute(
+                'SELECT c_last FROM "customer_2-7" WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s',
+                (w_id, d_id, c_id),
+            )
+            c_last = self.cursor.fetchone()[0]
 
             # step 6
             total_amount = total_amount * (1 + d_tax + w_tax) * (1 - float(c_discount))
@@ -230,45 +311,75 @@ class Transactions:
         """
         try:
             # Step 1: Update the warehouse by incrementing W_YTD by PAYMENT
+
             self.cursor.execute(
-                sql.SQL("UPDATE warehouse SET W_YTD = W_YTD + %s WHERE W_ID = %s;"),
-                (payment, c_w_id),
+                "UPDATE warehouse SET W_YTD = W_YTD + %s WHERE W_ID = %s", (payment, c_w_id)
             )
 
             # Step 2: Update the district by incrementing D_YTD by PAYMENT
             self.cursor.execute(
-                sql.SQL("UPDATE district SET D_YTD = D_YTD + %s WHERE D_W_ID = %s AND D_ID = %s;"),
+                "UPDATE district SET D_YTD = D_YTD + %s WHERE D_W_ID = %s AND D_ID = %s",
                 (payment, c_w_id, c_d_id),
             )
 
             # Step 3
             self.cursor.execute(
                 """
+                UPDATE "customer_2-7"
+                SET C_BALANCE = C_BALANCE - %s
+                WHERE C_W_ID = %s
+                AND C_D_ID = %s
+                AND C_ID = %s;
+                """,
+                (payment, c_w_id, c_d_id, c_id),
+            )
+
+            self.cursor.execute(
+                """
                 UPDATE customer
                 SET 
-                    C_BALANCE = C_BALANCE - %s,
                     C_YTD_PAYMENT = C_YTD_PAYMENT + %s,
                     C_PAYMENT_CNT = C_PAYMENT_CNT + 1
                 WHERE C_W_ID = %s
                 AND C_D_ID = %s
                 AND C_ID = %s;
                 """,
-                (payment, payment, c_w_id, c_d_id, c_id),
+                (payment, c_w_id, c_d_id, c_id),
             )
 
             # Step 4: Fetch the customer details including name, address, phone, credit info, balance, etc.
             self.cursor.execute(
                 """
-                SELECT C_W_ID, C_D_ID, C_ID, C_FIRST, C_MIDDLE, C_LAST, 
-                    C_STREET_1, C_STREET_2, C_CITY, C_STATE, C_ZIP,
+                SELECT C_W_ID, C_D_ID, C_ID, 
+                    C_STREET_1, C_STREET_2, C_CITY, C_ZIP,
                     C_PHONE, C_SINCE, C_CREDIT, C_CREDIT_LIM, 
-                    C_DISCOUNT, C_BALANCE
+                    C_DISCOUNT
                 FROM customer
                 WHERE C_W_ID = %s AND C_D_ID = %s AND C_ID = %s;
                 """,
                 (c_w_id, c_d_id, c_id),
             )
             customer_info = self.cursor.fetchone()
+
+            self.cursor.execute(
+                """
+                SELECT C_STATE
+                FROM "customer_2-8"
+                WHERE C_W_ID = %s AND C_D_ID = %s AND C_ID = %s;
+                """,
+                (c_w_id, c_d_id, c_id),
+            )
+            customer_state = self.cursor.fetchone()
+
+            self.cursor.execute(
+                """
+                SELECT C_FIRST, C_MIDDLE, C_LAST, C_BALANCE
+                FROM "customer_2-7"
+                WHERE C_W_ID = %s AND C_D_ID = %s AND C_ID = %s;
+                """,
+                (c_w_id, c_d_id, c_id),
+            )
+            customer_name_bal = self.cursor.fetchone()
 
             # Step 5: Fetch the warehouse address
             self.cursor.execute(
@@ -292,25 +403,24 @@ class Transactions:
             )
             district_addr = self.cursor.fetchone()
 
-            # Step 7: Format and output the required information
             output = [
                 customer_info[0],
                 customer_info[1],
                 customer_info[2],
+                customer_name_bal[0],
+                customer_name_bal[1],
+                customer_name_bal[2],
                 customer_info[3],
                 customer_info[4],
                 customer_info[5],
+                customer_state[0],
                 customer_info[6],
                 customer_info[7],
                 customer_info[8],
                 customer_info[9],
                 customer_info[10],
                 customer_info[11],
-                customer_info[12],
-                customer_info[13],
-                customer_info[14],
-                customer_info[15],
-                f"{customer_info[16]:.2f}",
+                f"{customer_name_bal[3]:.2f}",
             ]
             output.extend(
                 [
@@ -416,11 +526,20 @@ class Transactions:
                 # Step 1d: Update the customer balance and increment the delivery count
                 self.cursor.execute(
                     """
-                    UPDATE customer
-                    SET c_balance = c_balance + %s, c_delivery_cnt = c_delivery_cnt + 1 
+                    UPDATE "customer_2-7"
+                    SET c_balance = c_balance + %s
                     WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s
                     """,
                     (total_amount, w_id, district_no, customer_id),
+                )
+
+                self.cursor.execute(
+                    """
+                    UPDATE customer
+                    SET c_delivery_cnt = c_delivery_cnt + 1 
+                    WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s
+                    """,
+                    (w_id, district_no, customer_id),
                 )
 
         except (Exception, psycopg2.DatabaseError) as error:
@@ -447,11 +566,10 @@ class Transactions:
         try:
             # self.cursor.execute("BEGIN")
 
-            # Step 1: Get customer name and balance
             self.cursor.execute(
                 """
                 SELECT c_first, c_middle, c_last, c_balance
-                FROM customer
+                FROM "customer_2-7"
                 WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s
             """,
                 (c_w_id, c_d_id, c_id),
@@ -531,7 +649,8 @@ class Transactions:
 
             # Step 1: Get the next available order number for the district
             self.cursor.execute(
-                "SELECT d_next_o_id FROM district WHERE d_w_id = %s AND d_id = %s", (w_id, d_id)
+                'SELECT d_next_o_id FROM "district_2-5" WHERE d_w_id = %s AND d_id = %s',
+                (w_id, d_id),
             )
             next_order_id = self.cursor.fetchone()[0]
 
@@ -548,10 +667,10 @@ class Transactions:
 
             if not item_ids:
                 print("No items found in the last orders.")
-                return 0
+                return None
 
             # Step 3: Check stock levels for the items and count how many are below the threshold
-            query = "SELECT COUNT(*) FROM stock WHERE s_w_id = %s AND s_i_id = ANY(%s) AND s_quantity < %s"
+            query = 'SELECT COUNT(*) FROM "stock_2-5" WHERE s_w_id = %s AND s_i_id = ANY(%s) AND s_quantity < %s'
             self.cursor.execute(query, (w_id, item_ids, threshold))
             low_stock_count = self.cursor.fetchone()[0]
 
@@ -567,7 +686,7 @@ class Transactions:
         except (Exception, psycopg2.DatabaseError) as error:
             print(f"An error occurred: {error}")
             self.cursor.execute("ROLLBACK")
-            return 0
+            return None
 
     # 2.6 popular-item transaction
     def popular_item_txn(self, w_id, d_id, l):
@@ -596,7 +715,7 @@ class Transactions:
             self.cursor.execute(
                 """
                 SELECT d_next_o_id 
-                FROM district 
+                FROM "district_2-5" 
                 WHERE d_w_id = %s AND d_id = %s
             """,
                 (w_id, d_id),
@@ -625,7 +744,7 @@ class Transactions:
                 """
                 SELECT ol_i_id, SUM(ol_quantity) as total_qty, COUNT(DISTINCT ol_o_id) as num_orders
                 FROM "order-line"
-                WHERE ol_w_id = %s AND ol_d_id = %s AND ol_o_id = ANY(%s)
+                WHERE ol_w_id = %s AND ol_d_id = %s AND ol_o_id = ANY(%s::int[])
                 GROUP BY ol_i_id
             """,
                 (w_id, d_id, last_order_ids),
@@ -704,15 +823,12 @@ class Transactions:
             # self.cursor.execute("BEGIN")
 
             # Step 1: Get the top 10 customers by balance in non-ascending order
-            # NOTE: This query is SLOW AF - to be optimized later
             self.cursor.execute(
                 """
                 SELECT 
                     C_FIRST, C_MIDDLE, C_LAST, C_BALANCE, 
                     C_W_ID, C_D_ID
-                FROM customer 
-                JOIN warehouse ON customer.c_w_id = warehouse.w_id 
-                JOIN district ON customer.c_d_id = district.d_id 
+                FROM "customer_2-7"
                 ORDER BY C_BALANCE DESC 
                 LIMIT 10
             """
@@ -768,6 +884,7 @@ class Transactions:
             print(output)
 
             return None
+
         except (Exception, psycopg2.DatabaseError) as error:
             print(f"An error occurred: {error}")
             self.cursor.execute("ROLLBACK")
@@ -796,13 +913,12 @@ class Transactions:
             self.cursor.execute(
                 """
                 SELECT c_state 
-                FROM customer 
+                FROM "customer_2-8" 
                 WHERE c_w_id = %s AND c_d_id = %s AND c_id = %s
             """,
                 (c_w_id, c_d_id, c_id),
             )
             customer_state = self.cursor.fetchone()[0]
-            print(customer_state)
 
             # Step 2: Get the last order ID and item IDs for the given customer
             self.cursor.execute(
@@ -815,7 +931,6 @@ class Transactions:
                 (c_w_id, c_d_id, c_id),
             )
             customer_last_order_id = self.cursor.fetchone()[0]
-            print(customer_last_order_id)
 
             self.cursor.execute(
                 """
@@ -831,45 +946,40 @@ class Transactions:
             if not item_ids_tuple:
                 # No items in the last order, so no related customers
                 print("No items in the customer's last order.")
-                return []
+                return None
 
             # Step 3: Find related customers
             self.cursor.execute(
                 """
-                WITH c2_customers AS (
-                    SELECT c_w_id, c_d_id, c_id
-                    FROM customer
-                    WHERE c_state = %s
-                    AND NOT (c_w_id = %s AND c_d_id = %s AND c_id = %s)
-                ),
-                c2_last_orders AS (
-                    SELECT c2.c_w_id, c2.c_d_id, c2.c_id, o.o_id
-                    FROM c2_customers c2
-                    JOIN LATERAL (
-                        SELECT o_id
-                        FROM "order" o
-                        WHERE o.o_w_id = c2.c_w_id AND o.o_d_id = c2.c_d_id AND o.o_c_id = c2.c_id
-                        ORDER BY o_entry_d DESC LIMIT 1
-                    ) o ON true
-                ),
-                c2_items AS (
-                    SELECT c2.c_w_id, c2.c_d_id, c2.c_id, ol.ol_i_id
-                    FROM c2_last_orders c2
-                    JOIN "order-line" ol 
-                    ON ol.ol_w_id = c2.c_w_id AND ol.ol_d_id = c2.c_d_id AND ol.ol_o_id = c2.o_id
-                    WHERE ol.ol_i_id IN %s
-                )
-                
+            WITH c2_customers AS (
                 SELECT c_w_id, c_d_id, c_id
-                FROM (
-                    SELECT c2_items.c_w_id, c2_items.c_d_id, c2_items.c_id, COUNT(DISTINCT c2_items.ol_i_id) AS common_items
-                    FROM c2_items
-                    GROUP BY c2_items.c_w_id, c2_items.c_d_id, c2_items.c_id
-                ) sub
-                WHERE sub.common_items >= 2
-                ORDER BY c_w_id, c_d_id, c_id
-                """,
-                (customer_state, c_w_id, c_d_id, c_id, item_ids_tuple),
+                FROM "customer_2-8"
+                WHERE c_state = %s
+                AND NOT (c_w_id = %s AND c_d_id = %s AND c_id = %s)
+            ),
+            c2_last_orders AS (
+                SELECT o.o_w_id AS c_w_id, o.o_d_id AS c_d_id, o.o_c_id AS c_id, MAX(o.o_id) AS o_id
+                FROM "order" o
+                JOIN c2_customers c2 ON o.o_w_id = c2.c_w_id AND o.o_d_id = c2.c_d_id AND o.o_c_id = c2.c_id
+                GROUP BY o.o_w_id, o.o_d_id, o.o_c_id
+            ),
+            c2_items AS (
+                SELECT c2.c_w_id, c2.c_d_id, c2.c_id, ol.ol_i_id
+                FROM c2_last_orders c2
+                JOIN "order-line" ol 
+                ON ol.ol_w_id = c2.c_w_id AND ol.ol_d_id = c2.c_d_id AND ol.ol_o_id = c2.o_id
+                WHERE ol.ol_i_id = ANY(%s)
+            )
+            SELECT c_w_id, c_d_id, c_id
+            FROM (
+                SELECT c2_items.c_w_id, c2_items.c_d_id, c2_items.c_id, COUNT(DISTINCT c2_items.ol_i_id) AS common_items
+                FROM c2_items
+                GROUP BY c2_items.c_w_id, c2_items.c_d_id, c2_items.c_id
+            ) sub
+            WHERE sub.common_items >= 2
+            ORDER BY c_w_id, c_d_id, c_id
+        """,
+                (customer_state, c_w_id, c_d_id, c_id, customer_item_ids),
             )
 
             related_customers = self.cursor.fetchall()

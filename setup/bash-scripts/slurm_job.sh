@@ -10,5 +10,5 @@ rm -rf $PGDATA
 coordinator_node=$(scontrol show hostnames | head -n 1)
 srun -l bash setup.sh $coordinator_node
 wait
-
+echo "LOG: Job completed at $(date +"%Y-%m-%d %H:%M:%S")"
 
