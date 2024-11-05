@@ -12,6 +12,7 @@ pip install -r requirements.txt
 ```
 
 ## Project Structure
+```
 .
 ├── code
 │   ├── README.md
@@ -25,10 +26,12 @@ pip install -r requirements.txt
 │   ├── schema_v4.sql
 │   └── transactions.py
 ├── config
+│   └── config.txt
 └── output
     ├── clients.csv
     ├── dbstate.csv
     └── throughput.csv
+```
 
 > @yixin: Add the bash scripts for the batch jobs, adjust the file paths as necessary🙏🏻
 > After inserting the relevant files, update the project structure and code running too:>
