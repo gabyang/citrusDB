@@ -1,10 +1,10 @@
 import sys
 import time
 
-import query_statistics
-
 import metrics
-from transactions import Transactions
+import query_statistics
+import throughput
+from transactionsV3 import Transactions
 
 client_number = sys.argv[1]  # Get client number from command line
 results_dir = sys.argv[2]  # Get output directory from command line
@@ -81,21 +81,28 @@ for line in sys.stdin:
     # Read and parse transaction from stdin
     process_transaction(line.split(","))
 
-print("Measuring database statistics")
-query_statistics.query_statistics(txn.cursor, results_dir)
+try:
+    print("Measuring database statistics")
+    query_statistics.query_statistics(txn.cursor, results_dir)
 
-print("Measuring performance metrics")
-perf_metrics = metrics.performance_metrics(
-    total_num_exec_xacts, total_exec_time, latencies, results_dir
-)
+    print("Measuring performance metrics")
+    perf_metrics = metrics.performance_metrics(
+        total_num_exec_xacts, total_exec_time, latencies, results_dir
+    )
 
-print(f"Client {client_number}: writing performance metrics")
-metrics.write_metrics_csv(client_number, perf_metrics)
+    print(f"Client {client_number}: writing performance metrics")
+    metrics.write_metrics_csv(client_number, perf_metrics)
 
+    throughput.throughput(results_dir)
 
-print(f"Total Transactions Executed: {total_num_exec_xacts}")
-print(f"Total Execution Time: {total_exec_time:.2f} seconds")
-print(f"Average Latency: {sum(latencies) / total_num_exec_xacts:.2f} seconds")
+    print(f"Total Transactions Executed: {total_num_exec_xacts}")
+    print(f"Total Execution Time: {total_exec_time:.2f} seconds")
+    print(f"Average Latency: {sum(latencies) / total_num_exec_xacts:.2f} seconds")
 
-# txn.__close_connection__()
+    print("LOG: main.py terminated successfully at ", time.strftime("%H:%M:%S"))
+except Exception as e:
+    print("LOG: main.py terminated with exception at ", time.strftime("%H:%M:%S"))
+    print(e)
+    txn.__close_connection__()
+
 txn.__close_connection__()

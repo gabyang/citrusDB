@@ -2,7 +2,8 @@
 
 coordinator_node=$1
 HOSTNAME=$(hostname)
-REMAINDER=$(($SLURM_PROCID % 5))
+# REMAINDER=$(($SLURM_PROCID % 5))
+REMAINDER=$(($SLURM_PROCID % $SLURM_NTASKS_PER_NODE))
 
 INSTALLDIR=$HOME/pgsql
 SCRIPTSDIR=$HOME/tyx021
@@ -98,10 +99,6 @@ else
     python3 ${CODEDIR}/main.py ${task_counter} ${OUTPUTDIR} < ${task_file}
     wait
     echo "LOG: Process $SLURM_PROCID has finished running txn ${task_file} at $(date +"%Y-%m-%d %H:%M:%S")"
-    
-    # remove this when ready to run all txn
-    # if [ ${task_counter} -eq 0 ]; then
-    # fi
 fi
 
 # To prevent the script from exiting before all processes are done

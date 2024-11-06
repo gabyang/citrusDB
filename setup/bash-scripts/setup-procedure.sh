@@ -5,17 +5,16 @@ HOSTNAME=$(hostname)
 REMAINDER=$(($SLURM_PROCID % 5))
 
 INSTALLDIR=$HOME/pgsql
-BASEDIR=$HOME/b_project
-CODEDIR=${BASEDIR}/code
-SCRIPTSDIR=${CODEDIR}/bash_scripts
-XACTDIR=${CODEDIR}/xact_files
-OUTPUTDIR=${BASEDIR}/output
+SCRIPTSDIR=$HOME/tyx021
+XACTDIR=$HOME/project_files/xact_files
+OUTPUTDIR=$HOME/output
+CODEDIR=$HOME/tyx021/test-run
 
 LOGFILE=${CODEDIR}/log.txt
 NODELIST=$(scontrol show hostname $SLURM_NODELIST) # Gets a list of hostnames
 NODE_ARRAY=($NODELIST) # Convert the list into an array
 
-SIGNAL_DIR=${BASEDIR}/signal/$SLURM_JOB_ID
+SIGNAL_DIR=$HOME/signal/$SLURM_JOB_ID
 TABLE_SETUP_DONE_SIGNAL_FILE="${SIGNAL_DIR}/table_setup_done"
 BARRIER_DIR=${SIGNAL_DIR}/barrier
 
@@ -38,6 +37,10 @@ wait_barrier() {
         sleep 5
     done
 }
+
+if [ ! -d "$HOME/signal" ]; then
+    mkdir -p "$HOME/signal"
+fi
 
 if [ ! -d "${SIGNAL_DIR}" ]; then
     mkdir -p ${SIGNAL_DIR}
@@ -74,6 +77,7 @@ if [ ${REMAINDER} -eq 0 ]; then
         mkdir -p ${OUTPUTDIR}
 
         bash ${SCRIPTSDIR}/init-data.sh
+        bash ${SCRIPTSDIR}/5_run_all_procedures.sh
         signal_table_setup_done
     else
         echo "Process $SLURM_PROCID on ${HOSTNAME} will be executing as a Citus worker node"
@@ -102,6 +106,7 @@ else
     
     # remove this when ready to run all txn
     # if [ ${task_counter} -eq 0 ]; then
+    #     python3 ${CODEDIR}/main.py ${task_counter} ${OUTPUTDIR} < "test-run/test.txt"
     # fi
 fi
 
