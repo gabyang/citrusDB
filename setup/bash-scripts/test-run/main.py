@@ -5,7 +5,7 @@ import metrics
 import query_statistics
 import throughput
 from transactionsV3 import Transactions
-
+# from transactionsV3_procedure import Transactions
 client_number = sys.argv[1]  # Get client number from command line
 results_dir = sys.argv[2]  # Get output directory from command line
 

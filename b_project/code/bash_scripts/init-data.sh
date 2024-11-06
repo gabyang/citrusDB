@@ -1,6 +1,5 @@
 INSTALLDIR=$HOME/pgsql
-# TODO: Change this to the correct path
-DATA_FOLDER=$HOME/tyx021/data_files
+DATA_FOLDER=$HOME/b_project/code/data_files
 SCHEMA_FOLDER=$HOME/b_project/code
 
 ${INSTALLDIR}/bin/psql -U $PGUSER -d $PGDATABASE -c "\i ${SCHEMA_FOLDER}/schema_v4.sql"

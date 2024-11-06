@@ -4,8 +4,7 @@ import time
 import query_statistics
 import throughput
 
-from transactions import Transactions
-
+from final_transactions import Transactions
 import metrics
 
 client_number = sys.argv[1]  # Get client number from command line
