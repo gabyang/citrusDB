@@ -15,7 +15,7 @@ def query_statistics(cursor, results_dir):
         "SELECT SUM(S_YTD), SUM(S_ORDER_CNT), SUM(S_REMOTE_CNT) FROM Stock",
     ]
 
-    resultPath = f"{results_dir}/database_state.csv"
+    resultPath = f"{results_dir}/dbstate.csv"
     print(resultPath)
 
     with open(resultPath, "w") as f:

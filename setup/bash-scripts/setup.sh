@@ -88,7 +88,7 @@ else
 
     # Calculate the task file based on the process ID
     for ((i=0; i<${SLURM_PROCID}; i++)); do
-        if [ $((i % 5)) -ne 0 ]; then
+        if [ $((i % $SLURM_NTASKS_PER_NODE)) -ne 0 ]; then
             task_counter=$((task_counter + 1))
         fi
     done
