@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=citus
-#SBATCH --nodes=10
-#SBATCH --ntasks-per-node=3
+#SBATCH --nodes=5
+#SBATCH --ntasks-per-node=5
 #SBATCH --partition=long
 #SBATCH --time=120
-
 
 rm -rf $PGDATA
 coordinator_node=$(scontrol show hostnames | head -n 1)

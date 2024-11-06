@@ -51,7 +51,7 @@ def write_metrics_csv(client_number, metrics):
         "measurement_f",
         "measurement_g",
     ]
-    resultPath = f"{results_dir}/performance_metrics.csv"
+    resultPath = f"{results_dir}/clients.csv"
 
     with open(resultPath, "a") as f:
         writer = csv.writer(f)

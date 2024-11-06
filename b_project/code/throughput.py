@@ -5,7 +5,7 @@ result_path = "throughput.csv"
 
 def throughput(results_dir):
     result_path = f"{results_dir}/throughput.csv"
-    performance_metrics_path = f"{results_dir}/performance_metrics.csv"
+    performance_metrics_path = f"{results_dir}/clients.csv"
     with open(result_path, "w") as f:
         # Open the clients.csv file and read in the 3rd column into a list
         # Get the minimum, average and maximum values of the list
