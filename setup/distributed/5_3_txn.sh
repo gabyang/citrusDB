@@ -5,80 +5,63 @@ DROP_PROCEDURE_SQL="DROP PROCEDURE IF EXISTS delivery_txn(INT, INT);"
 
 # SQL command to create the procedure
 CREATE_PROCEDURE_SQL=$(cat <<EOF
-CREATE OR REPLACE PROCEDURE delivery_txn(W_ID INT, CARRIER_ID INT)
+CREATE OR REPLACE PROCEDURE delivery_txn(
+    IN p_w_id INT,
+    IN p_carrier_id INT
+)
 LANGUAGE plpgsql
 AS \$\$
 DECLARE
-    DISTRICT_NO INT;
-    N INT; -- Order ID
-    cust_ID INT; -- Customer ID
-    OL_AMOUNT_SUM DECIMAL(12, 2); -- Sum of OL_AMOUNT
-    curr_time TIMESTAMP;
-    BEFORE_C_BALANCE DECIMAL(12,2);
-    AFTER_C_BALANCE DECIMAL(12,2);
+    district_no INT;
+    next_order_id INT;
+    customer_id INT;
+    total_amount NUMERIC;
+    delivery_time TIMESTAMP;
 BEGIN
-    curr_time := CURRENT_TIMESTAMP;
-    -- Loop through each district (1 to 10)
-    FOR DISTRICT_NO IN 1..10 LOOP
-        -- Step a: Find the smallest O_ID (N) for the district where O_CARRIER_ID is NULL
-        SELECT O_ID, O_C_ID INTO N, cust_ID
-        FROM "order"
-        WHERE O_W_ID = W_ID 
-          AND O_D_ID = DISTRICT_NO 
-          AND O_CARRIER_ID IS NULL
-        ORDER BY O_ID ASC
-        LIMIT 1;
+    delivery_time := CURRENT_TIMESTAMP;
 
-        -- If no such order exists, skip to the next district
-        IF NOT FOUND THEN
+    -- Process steps for district numbers 1 through 10
+    FOR district_no IN 1..10 LOOP
+
+        -- Step 1a: Find the smallest order number O_ID for the district with O_CARRIER_ID IS NULL
+        SELECT MIN(o_id) INTO next_order_id
+        FROM "order"
+        WHERE o_w_id = p_w_id AND o_d_id = district_no AND o_carrier_id IS NULL;
+
+        IF next_order_id IS NULL THEN
+            -- No valid order is found, continue to the next district
             CONTINUE;
         END IF;
 
-        -- Step b: Update the order X by setting O_CARRIER_ID to CARRIER_ID
+        -- Step 1b: Find the customer who placed the order
+        SELECT o_c_id INTO customer_id
+        FROM "order"
+        WHERE o_w_id = p_w_id AND o_d_id = district_no AND o_id = next_order_id;
+
+        -- Update the order by setting O_CARRIER_ID
         UPDATE "order"
-        SET O_CARRIER_ID = CARRIER_ID
-        WHERE O_W_ID = W_ID 
-          AND O_D_ID = DISTRICT_NO
-          AND O_ID = N;
+        SET o_carrier_id = p_carrier_id
+        WHERE o_w_id = p_w_id AND o_d_id = district_no AND o_id = next_order_id;
 
-        -- Step c: Update the order-lines for order N by setting OL_DELIVERY_D to the current date and time
+        -- Step 1c: Update all the order lines for this order by setting OL_DELIVERY_D to the current date and time
         UPDATE "order-line"
-        SET OL_DELIVERY_D = curr_time
-        WHERE OL_W_ID = W_ID
-          AND OL_D_ID = DISTRICT_NO
-          AND OL_O_ID = N;
+        SET ol_delivery_d = delivery_time
+        WHERE ol_w_id = p_w_id AND ol_d_id = district_no AND ol_o_id = next_order_id;
 
-        -- Step d: Calculate the sum of OL_AMOUNT for the order lines in order N
-        SELECT SUM(OL_AMOUNT) INTO OL_AMOUNT_SUM
+        -- Step 1d: Calculate the total amount from all order lines for this order
+        SELECT SUM(ol_amount) INTO total_amount
         FROM "order-line"
-        WHERE OL_W_ID = W_ID
-          AND OL_D_ID = DISTRICT_NO
-          AND OL_O_ID = N;
-        RAISE NOTICE 'OL_AMOUNT_SUM %', OL_AMOUNT_SUM;
-        SELECT C_BALANCE into BEFORE_C_BALANCE FROM customer WHERE C_W_ID = W_ID
-          AND C_D_ID = DISTRICT_NO
-          AND C_ID = cust_ID;
+        WHERE ol_w_id = p_w_id AND ol_d_id = district_no AND ol_o_id = next_order_id;
 
-        RAISE NOTICE 'BEFORE_C_BALANCE %', BEFORE_C_BALANCE;
-        
-        -- Increment the customer's balance by the total OL_AMOUNT (B) and delivery count
-        UPDATE customer
-        SET C_BALANCE = C_BALANCE + OL_AMOUNT_SUM,
-            C_DELIVERY_CNT = C_DELIVERY_CNT + 1
-        WHERE C_W_ID = W_ID
-          AND C_D_ID = DISTRICT_NO
-          AND C_ID = cust_ID;
-
+        -- Update the customer balance and increment the delivery count
         UPDATE "customer_2-7"
-        SET C_BALANCE = C_BALANCE + OL_AMOUNT_SUM
-        WHERE C_W_ID = W_ID
-          AND C_D_ID = DISTRICT_NO
-          AND C_ID = cust_ID;
+        SET c_balance = c_balance + total_amount
+        WHERE c_w_id = p_w_id AND c_d_id = district_no AND c_id = customer_id;
 
-        SELECT C_BALANCE into AFTER_C_BALANCE FROM customer WHERE C_W_ID = W_ID
-          AND C_D_ID = DISTRICT_NO
-          AND C_ID = cust_ID;
-        RAISE NOTICE 'AFTER_C_BALANCE %', AFTER_C_BALANCE;
+        UPDATE customer
+        SET c_delivery_cnt = c_delivery_cnt + 1
+        WHERE c_w_id = p_w_id AND c_d_id = district_no AND c_id = customer_id;
+
 
     END LOOP;
 END;
@@ -87,7 +70,7 @@ EOF
 )
 
 # Execute the SQL commands via psql
-DB_NAME='postgres'
-USER_NAME='postgres'
+DB_NAME='gabriel.yang'
+USER_NAME='gabriel.yang'
 psql -U "${USER_NAME}" -d "${DB_NAME}" -c "$DROP_PROCEDURE_SQL"
 psql -U "${USER_NAME}" -d "${DB_NAME}" -c "$CREATE_PROCEDURE_SQL"

@@ -29,8 +29,8 @@ BEGIN
     WHERE c_w_id = p_c_w_id AND c_d_id = p_c_d_id AND c_id = p_c_id;
 
     -- Output customer information
-    RAISE NOTICE 'Customer Name: % % %', v_c_first, v_c_middle, v_c_last;
-    RAISE NOTICE 'Customer Balance: %', v_c_balance;
+    --RAISE NOTICE 'Customer Name: % % %', v_c_first, v_c_middle, v_c_last;
+    --RAISE NOTICE 'Customer Balance: %', v_c_balance;
 
     -- Fetch the customer's last order
     SELECT o_id, o_entry_d, o_carrier_id
@@ -41,9 +41,9 @@ BEGIN
     LIMIT 1;
 
     -- Output last order information
-    RAISE NOTICE 'Last Order ID: %', v_o_id;
-    RAISE NOTICE 'Order Entry Date: %', v_o_entry_d;
-    RAISE NOTICE 'Order Carrier ID: %', v_o_carrier_id;
+    --RAISE NOTICE 'Last Order ID: %', v_o_id;
+    --RAISE NOTICE 'Order Entry Date: %', v_o_entry_d;
+    --RAISE NOTICE 'Order Carrier ID: %', v_o_carrier_id;
 
     -- Fetch and output each item in the customer's last order
     FOR item_row IN
@@ -51,12 +51,9 @@ BEGIN
         FROM "order-line"
         WHERE ol_w_id = p_c_w_id AND ol_d_id = p_c_d_id AND ol_o_id = v_o_id
     LOOP
-        RAISE NOTICE 'Item Number: %, Supply Warehouse: %, Quantity: %, Total Price: %, Delivery Date: %',
-            item_row.ol_i_id, item_row.ol_supply_w_id, item_row.ol_quantity, item_row.ol_amount, item_row.ol_delivery_d;
+        --RAISE NOTICE 'Item Number: %, Supply Warehouse: %, Quantity: %, Total Price: %, Delivery Date: %',
+        --    item_row.ol_i_id, item_row.ol_supply_w_id, item_row.ol_quantity, item_row.ol_amount, item_row.ol_delivery_d;
     END LOOP;
-
-    RAISE NOTICE 'Fetched all order lines for the last order';
-
 END;
 \$\$;
 EOF
