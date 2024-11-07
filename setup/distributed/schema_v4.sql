@@ -26,7 +26,6 @@ CREATE TABLE district (
 	D_ZIP CHAR(9),
 	D_TAX DECIMAL(4, 4),
 	D_YTD DECIMAL(12, 2),
-	-- D_NEXT_O_ID INT,
 	PRIMARY KEY (D_W_ID, D_ID),
 	FOREIGN KEY (D_W_ID) REFERENCES Warehouse(W_ID)
 );
@@ -48,20 +47,15 @@ CREATE TABLE customer (
 	C_W_ID INT,
 	C_D_ID INT,
 	C_ID INT,
-	-- C_FIRST VARCHAR(16),
-	-- C_MIDDLE CHAR(2),
-	-- C_LAST VARCHAR(16),
 	C_STREET_1 VARCHAR(20),
 	C_STREET_2 VARCHAR(20),
 	C_CITY VARCHAR(20),
-	-- C_STATE CHAR(2),
 	C_ZIP CHAR(9),
 	C_PHONE CHAR(16),
 	C_SINCE TIMESTAMP,
 	C_CREDIT CHAR(2),
 	C_CREDIT_LIM DECIMAL(12, 2),
 	C_DISCOUNT DECIMAL(5, 4),
-	-- C_BALANCE DECIMAL(12, 2),
 	C_YTD_PAYMENT FLOAT,
 	C_PAYMENT_CNT INT,
 	C_DELIVERY_CNT INT,
@@ -143,7 +137,6 @@ CREATE TABLE "order-line" (
     OL_DIST_INFO CHAR(24),
     PRIMARY KEY (OL_W_ID, OL_D_ID, OL_O_ID, OL_NUMBER),
     FOREIGN KEY (OL_W_ID, OL_D_ID, OL_O_ID) REFERENCES "order"(O_W_ID, O_D_ID, O_ID)
-    -- FOREIGN KEY (OL_I_ID) REFERENCES Item(I_ID)
 );
 SELECT create_distributed_table('order-line', 'ol_w_id', colocate_with => 'warehouse');
 CREATE INDEX "order-line_OL-O_idx" ON "order-line" (OL_W_ID, OL_D_ID, OL_O_ID);
@@ -164,7 +157,6 @@ CREATE INDEX "order-line-item-constraint_idx" ON "order-line-item-constraint" (O
 CREATE TABLE Stock (
     S_W_ID INT,
     S_I_ID INT,
-    -- S_QUANTITY DECIMAL(4, 0),
     S_YTD DECIMAL(8, 2),
     S_ORDER_CNT INT,
     S_REMOTE_CNT INT,
@@ -181,7 +173,6 @@ CREATE TABLE Stock (
     S_DATA VARCHAR(50),
     PRIMARY KEY (S_W_ID, S_I_ID),
     FOREIGN KEY (S_W_ID) REFERENCES Warehouse(W_ID)
-    -- FOREIGN KEY (S_I_ID) REFERENCES Item(I_ID)
 );
 SELECT create_distributed_table('stock', 's_w_id', colocate_with => 'warehouse');
 CREATE INDEX "stock_idx" ON Stock (S_W_ID, S_I_ID);
